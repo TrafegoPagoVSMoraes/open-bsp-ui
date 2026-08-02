@@ -10,7 +10,7 @@ export function useTemplates(organizationAddress?: string) {
     queryFn: async () => {
       if (!organizationAddress) return [];
 
-      const { data } = await supabase.functions.invoke(
+      const { data, error } = await supabase.functions.invoke(
         "whatsapp-management/templates",
         {
           method: "PUT",
@@ -20,6 +20,14 @@ export function useTemplates(organizationAddress?: string) {
           },
         },
       );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        return [];
+      }
 
       return (data.data as TemplateData[]) || [];
     },
