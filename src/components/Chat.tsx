@@ -11,6 +11,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useCurrentOrganization } from "@/queries/useOrganizations";
 import { useCurrentAgent } from "@/queries/useAgents";
 import { AVATAR_COLORS } from "@/utils/colors";
+import { markConversationAsRead } from "@/utils/MessageUtils";
 
 type EnvelopeType = { message: MessageRow; first: boolean; last: boolean };
 type SeparatorType = { text: string; first: true; last: true };
@@ -60,6 +61,7 @@ export default function Chat() {
   const isAdmin = ["admin", "owner"].includes(agent?.extra?.role || "");
 
   const scroller = useRef<HTMLDivElement>(null);
+  const markingRead = useRef(new Set<string>());
 
   const { translate: t, currentLanguage } = useTranslation();
 
@@ -210,6 +212,15 @@ export default function Chat() {
       return;
     }
   }, [messages.length, activeConvId]);
+
+  useEffect(() => {
+    if (!activeConvId || markingRead.current.has(activeConvId)) return;
+
+    markingRead.current.add(activeConvId);
+    void markConversationAsRead(activeConvId).finally(() => {
+      markingRead.current.delete(activeConvId);
+    });
+  }, [activeConvId, messages.length]);
 
   useEffect(() => {
     scrollToBottom(false);

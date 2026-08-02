@@ -77,3 +77,37 @@ export async function pushMessageToDb(
     throw insertQuery.error;
   }
 }
+
+export async function markConversationAsRead(conversationId: string) {
+  const state = useBoundStore.getState();
+  const messages = Array.from(
+    state.chat.messages.get(conversationId)?.values() || [],
+  );
+  const unread = messages.filter(
+    (message) =>
+      message.direction === "incoming" &&
+      !("read" in (message.status ?? {})),
+  );
+
+  if (!unread.length) return;
+
+  const readAt = new Date().toISOString();
+  const ids = unread.map((message) => message.id);
+  const { error } = await supabase
+    .from("messages")
+    .update({ status: { read: readAt } })
+    .in("id", ids);
+
+  if (error) {
+    console.error("Could not mark conversation messages as read", error);
+    return;
+  }
+
+  state.chat.pushMessages(
+    unread.map((message) => ({
+      ...message,
+      status: { ...message.status, read: readAt },
+      updated_at: readAt,
+    })),
+  );
+}

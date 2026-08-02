@@ -218,38 +218,27 @@ export default function ChatListItem({ itemId }: { itemId: string }) {
         } as MessageRow);
 
   const unread = (() => {
-    let count = 0;
     let notification = false;
-    let countBreak = false;
 
     if (!messages) {
-      return { count, notification };
+      return { count: 0, notification };
     }
 
-    // Messages are sorted by most recent first.
     for (const msg of messages) {
-      if (msg.direction === "incoming" && !countBreak) {
-        count += 1;
-      } else if (
+      if (
         msg.direction === "internal" &&
         // @ts-expect-error notification is deprecated (TODO: remove)
         msg.content.kind === "notification"
       ) {
         notification = true;
-      } else if (
-        msg.direction === "outgoing" &&
-        agents
-          ?.filter((a) => !a.ai)
-          .map((a) => a.id)
-          .includes(msg.agent_id || "")
-      ) {
-        // Only humans can mark notifications as responded.
-        break;
-      } else if (msg.direction === "outgoing") {
-        // Any agent can mark incoming messages as responded.
-        countBreak = true;
       }
     }
+
+    const count = messages.filter(
+      (message) =>
+        message.direction === "incoming" &&
+        !("read" in (message.status ?? {})),
+    ).length;
 
     return { count, notification };
   })();
