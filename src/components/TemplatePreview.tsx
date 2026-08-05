@@ -54,11 +54,11 @@ export default function TemplatePreview({
 
   const headExamples = head?.example?.header_text || [];
   const bodyExamplesMemo = useMemo(
-    () => body.example?.body_text[0] || [],
+    () => body.example?.body_text?.[0] || [],
     [body.example?.body_text],
   );
   const bodyExamples = editMode
-    ? body.example?.body_text[0] || []
+    ? body.example?.body_text?.[0] || []
     : bodyExamplesMemo;
 
   const buttons = butt?.buttons;
