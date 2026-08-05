@@ -62,12 +62,19 @@ type FooterComponent = {
 
 type ButtonsComponent = {
   type: "BUTTONS";
-  buttons: QuickReply[]; // TODO: call to action buttons - cabra 2024/09/12
+  buttons: (QuickReply | UrlButton)[];
 };
 
 type QuickReply = {
   type: "QUICK_REPLY";
   text: string;
+};
+
+type UrlButton = {
+  type: "URL";
+  text: string;
+  url: string;
+  example?: string[];
 };
 
 // Template message, used to send a template message
@@ -92,6 +99,7 @@ type DateTimeParameter = {
 type TextParameter = {
   type: "text";
   text: string;
+  parameter_name?: string;
 };
 
 type TemplateParameter =
@@ -126,7 +134,7 @@ type TemplateButton = {
   | {
       sub_type: "url";
       parameters: {
-        type: "url";
+        type: "text";
         text: string;
       }[];
     }

@@ -148,6 +148,7 @@ export default function ChatFooter() {
   const templateDraft = templateDraftEntry?.template;
   const bodyVarValues = templateDraftEntry?.bodyVarValues || [];
   const headVarValues = templateDraftEntry?.headVarValues || [];
+  const buttonVarValues = templateDraftEntry?.buttonVarValues || [];
 
   const templateBody = templateDraft?.components.find((c) => c.type === "BODY");
   const templateHead = templateDraft?.components.find(
@@ -163,14 +164,30 @@ export default function ChatFooter() {
   const bodyExamples = templateBody?.example?.body_text?.[0] || [];
   const headExamples = templateHead?.example?.header_text || [];
 
-  // Count how many variables are in the template body/header
-  const bodyVarCount = (templateBody?.text.match(/\{\{\d+\}\}/g) || []).length;
-  const headVarCount = (templateHead?.text?.match(/\{\{\d+\}\}/g) || []).length;
+  const bodyVarNames = Array.from(
+    templateBody?.text.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g) || [],
+    (match) => match[1],
+  );
+  const headVarNames = Array.from(
+    templateHead?.text?.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g) || [],
+    (match) => match[1],
+  );
+  const bodyVarCount = bodyVarNames.length;
+  const headVarCount = headVarNames.length;
+  const dynamicUrlButtons =
+    templateButtons?.buttons.flatMap((button) =>
+      button.type === "URL" && /\{\{[^}]+\}\}/.test(button.url)
+        ? [button]
+        : [],
+    ) || [];
 
   const allVarsFilled =
     templateDraft &&
     bodyVarValues.slice(0, bodyVarCount).every((v) => v.trim() !== "") &&
-    headVarValues.slice(0, headVarCount).every((v) => v.trim() !== "");
+    headVarValues.slice(0, headVarCount).every((v) => v.trim() !== "") &&
+    buttonVarValues
+      .slice(0, dynamicUrlButtons.length)
+      .every((v) => v.trim() !== "");
 
   function updateVarValues(bodyVars: string[], headVars: string[]) {
     if (!activeConvId || !templateDraftEntry) return;
@@ -178,6 +195,17 @@ export default function ChatFooter() {
       ...templateDraftEntry,
       bodyVarValues: bodyVars,
       headVarValues: headVars,
+      buttonVarValues,
+    });
+  }
+
+  function updateButtonVarValue(index: number, value: string) {
+    if (!activeConvId || !templateDraftEntry) return;
+    const values = [...buttonVarValues];
+    values[index] = value;
+    setTemplateDraft(activeConvId, {
+      ...templateDraftEntry,
+      buttonVarValues: values,
     });
   }
 
@@ -288,49 +316,66 @@ export default function ChatFooter() {
     const components: TemplateMessage["template"]["components"] = [];
 
     if (headVarValues.length && headVarCount > 0) {
-      let idx = 1;
-      for (const value of headVarValues.slice(0, headVarCount)) {
-        headContent = headContent?.replaceAll(`{{${idx}}}`, value);
-        idx++;
+      for (const [idx, value] of headVarValues.slice(0, headVarCount).entries()) {
+        headContent = headContent?.replaceAll(`{{${headVarNames[idx]}}}`, value);
       }
       components.push({
         type: "header",
-        parameters: headVarValues.slice(0, headVarCount).map((text) => ({
+        parameters: headVarValues.slice(0, headVarCount).map((text, idx) => ({
           type: "text" as const,
           text,
+          ...(Number.isNaN(Number(headVarNames[idx]))
+            ? { parameter_name: headVarNames[idx] }
+            : {}),
         })),
       });
     }
 
     if (bodyVarValues.length && bodyVarCount > 0) {
-      let idx = 1;
-      for (const value of bodyVarValues.slice(0, bodyVarCount)) {
-        bodyContent = bodyContent.replaceAll(`{{${idx}}}`, value);
-        idx++;
+      for (const [idx, value] of bodyVarValues.slice(0, bodyVarCount).entries()) {
+        bodyContent = bodyContent.replaceAll(`{{${bodyVarNames[idx]}}}`, value);
       }
       components.push({
         type: "body",
-        parameters: bodyVarValues.slice(0, bodyVarCount).map((text) => ({
+        parameters: bodyVarValues.slice(0, bodyVarCount).map((text, idx) => ({
           type: "text" as const,
           text,
+          ...(Number.isNaN(Number(bodyVarNames[idx]))
+            ? { parameter_name: bodyVarNames[idx] }
+            : {}),
         })),
       });
     }
 
     if (templateButtons?.buttons) {
       let idx = 0;
+      let dynamicUrlIndex = 0;
       for (const button of templateButtons.buttons) {
-        components.push({
-          type: "button",
-          sub_type: "quick_reply",
-          index: idx.toString(),
-          parameters: [
-            {
-              type: "payload",
-              payload: button.text.toLowerCase().replaceAll(" ", "_"),
-            },
-          ],
-        });
+        if (button.type === "URL" && /\{\{[^}]+\}\}/.test(button.url)) {
+          components.push({
+            type: "button",
+            sub_type: "url",
+            index: idx.toString(),
+            parameters: [
+              { type: "text", text: buttonVarValues[dynamicUrlIndex] },
+            ],
+          });
+          dynamicUrlIndex++;
+        } else if (button.type === "QUICK_REPLY") {
+          components.push({
+            type: "button",
+            sub_type: "quick_reply",
+            index: idx.toString(),
+            parameters: [
+              {
+                type: "payload",
+                payload: button.text.toLowerCase().includes("parar")
+                  ? "OPT_OUT"
+                  : button.text.toLowerCase().replaceAll(" ", "_"),
+              },
+            ],
+          });
+        }
         idx++;
       }
     }
@@ -386,10 +431,10 @@ export default function ChatFooter() {
 
     // Render header if present
     if (templateHead?.text && headVarCount > 0) {
-      const headerSegments = templateHead.text.split(/(\{\{\d+\}\})/);
+      const headerSegments = templateHead.text.split(/(\{\{\s*[^}]+?\s*\}\})/);
       let headerIdx = 0;
       for (const seg of headerSegments) {
-        const match = seg.match(/^\{\{(\d+)\}\}$/);
+        const match = seg.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
         if (match) {
           parts.push({ varIndex: headerIdx, isHeader: true });
           headerIdx++;
@@ -403,10 +448,10 @@ export default function ChatFooter() {
     }
 
     // Render body
-    const segments = templateBody.text.split(/(\{\{\d+\}\})/);
+    const segments = templateBody.text.split(/(\{\{\s*[^}]+?\s*\}\})/);
     let bodyIdx = 0;
     for (const seg of segments) {
-      const match = seg.match(/^\{\{(\d+)\}\}$/);
+      const match = seg.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
       if (match) {
         parts.push({ varIndex: bodyIdx, isHeader: false });
         bodyIdx++;
@@ -461,6 +506,16 @@ export default function ChatFooter() {
             />
           ),
         )}
+        {dynamicUrlButtons.map((button, index) => (
+          <span key={`button-${index}`} className="block mt-[6px]">
+            <TemplateVarInput
+              placeholder={button.example?.[0] || "URL"}
+              value={buttonVarValues[index] || ""}
+              onChange={(value) => updateButtonVarValue(index, value)}
+              onEnter={() => allVarsFilled && sendTemplateMessage()}
+            />
+          </span>
+        ))}
       </div>
     );
   }
