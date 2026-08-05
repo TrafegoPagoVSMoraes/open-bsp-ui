@@ -26,6 +26,7 @@ import { Route as OnboardWhatsappTokenRouteImport } from './routes/onboard.whats
 import { Route as OnboardInstagramCallbackRouteImport } from './routes/onboard.instagram.callback'
 import { Route as OnboardInstagramTokenRouteImport } from './routes/onboard.instagram.$token'
 import { Route as AuthStatsUsageRouteImport } from './routes/_auth/stats/usage'
+import { Route as AuthStatsTrackingRouteImport } from './routes/_auth/stats/tracking'
 import { Route as AuthStatsQuotasRouteImport } from './routes/_auth/stats/quotas'
 import { Route as AuthIntegrationsMediaPreprocessingRouteImport } from './routes/_auth/integrations/media-preprocessing'
 import { Route as AuthConversationsNewRouteImport } from './routes/_auth/conversations/new'
@@ -146,6 +147,11 @@ const OnboardInstagramTokenRoute = OnboardInstagramTokenRouteImport.update({
 const AuthStatsUsageRoute = AuthStatsUsageRouteImport.update({
   id: '/usage',
   path: '/usage',
+  getParentRoute: () => AuthStatsRoute,
+} as any)
+const AuthStatsTrackingRoute = AuthStatsTrackingRouteImport.update({
+  id: '/tracking',
+  path: '/tracking',
   getParentRoute: () => AuthStatsRoute,
 } as any)
 const AuthStatsQuotasRoute = AuthStatsQuotasRouteImport.update({
@@ -370,6 +376,7 @@ export interface FileRoutesByFullPath {
   '/conversations/new': typeof AuthConversationsNewRoute
   '/integrations/media-preprocessing': typeof AuthIntegrationsMediaPreprocessingRoute
   '/stats/quotas': typeof AuthStatsQuotasRoute
+  '/stats/tracking': typeof AuthStatsTrackingRoute
   '/stats/usage': typeof AuthStatsUsageRoute
   '/onboard/instagram/$token': typeof OnboardInstagramTokenRoute
   '/onboard/instagram/callback': typeof OnboardInstagramCallbackRoute
@@ -423,6 +430,7 @@ export interface FileRoutesByTo {
   '/conversations/new': typeof AuthConversationsNewRoute
   '/integrations/media-preprocessing': typeof AuthIntegrationsMediaPreprocessingRoute
   '/stats/quotas': typeof AuthStatsQuotasRoute
+  '/stats/tracking': typeof AuthStatsTrackingRoute
   '/stats/usage': typeof AuthStatsUsageRoute
   '/onboard/instagram/$token': typeof OnboardInstagramTokenRoute
   '/onboard/instagram/callback': typeof OnboardInstagramCallbackRoute
@@ -479,6 +487,7 @@ export interface FileRoutesById {
   '/_auth/conversations/new': typeof AuthConversationsNewRoute
   '/_auth/integrations/media-preprocessing': typeof AuthIntegrationsMediaPreprocessingRoute
   '/_auth/stats/quotas': typeof AuthStatsQuotasRoute
+  '/_auth/stats/tracking': typeof AuthStatsTrackingRoute
   '/_auth/stats/usage': typeof AuthStatsUsageRoute
   '/onboard/instagram/$token': typeof OnboardInstagramTokenRoute
   '/onboard/instagram/callback': typeof OnboardInstagramCallbackRoute
@@ -535,6 +544,7 @@ export interface FileRouteTypes {
     | '/conversations/new'
     | '/integrations/media-preprocessing'
     | '/stats/quotas'
+    | '/stats/tracking'
     | '/stats/usage'
     | '/onboard/instagram/$token'
     | '/onboard/instagram/callback'
@@ -588,6 +598,7 @@ export interface FileRouteTypes {
     | '/conversations/new'
     | '/integrations/media-preprocessing'
     | '/stats/quotas'
+    | '/stats/tracking'
     | '/stats/usage'
     | '/onboard/instagram/$token'
     | '/onboard/instagram/callback'
@@ -643,6 +654,7 @@ export interface FileRouteTypes {
     | '/_auth/conversations/new'
     | '/_auth/integrations/media-preprocessing'
     | '/_auth/stats/quotas'
+    | '/_auth/stats/tracking'
     | '/_auth/stats/usage'
     | '/onboard/instagram/$token'
     | '/onboard/instagram/callback'
@@ -814,6 +826,13 @@ declare module '@tanstack/react-router' {
       path: '/usage'
       fullPath: '/stats/usage'
       preLoaderRoute: typeof AuthStatsUsageRouteImport
+      parentRoute: typeof AuthStatsRoute
+    }
+    '/_auth/stats/tracking': {
+      id: '/_auth/stats/tracking'
+      path: '/tracking'
+      fullPath: '/stats/tracking'
+      preLoaderRoute: typeof AuthStatsTrackingRouteImport
       parentRoute: typeof AuthStatsRoute
     }
     '/_auth/stats/quotas': {
@@ -1073,12 +1092,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthStatsRouteChildren {
   AuthStatsQuotasRoute: typeof AuthStatsQuotasRoute
+  AuthStatsTrackingRoute: typeof AuthStatsTrackingRoute
   AuthStatsUsageRoute: typeof AuthStatsUsageRoute
   AuthStatsIndexRoute: typeof AuthStatsIndexRoute
 }
 
 const AuthStatsRouteChildren: AuthStatsRouteChildren = {
   AuthStatsQuotasRoute: AuthStatsQuotasRoute,
+  AuthStatsTrackingRoute: AuthStatsTrackingRoute,
   AuthStatsUsageRoute: AuthStatsUsageRoute,
   AuthStatsIndexRoute: AuthStatsIndexRoute,
 }
