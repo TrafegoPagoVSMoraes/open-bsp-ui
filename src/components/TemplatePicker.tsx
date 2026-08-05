@@ -50,12 +50,20 @@ export default function TemplatePicker() {
   function select(template: TemplateData) {
     if (!activeConvId) return;
 
+    const body = template.components.find((c) => c.type === "BODY")?.text || "";
     const bodyExamples =
       template.components.find((c) => c.type === "BODY")?.example
-        ?.body_text[0] || [];
+        ?.body_text?.[0] ||
+      Array.from(body.matchAll(/\{\{[^}]+\}\}/g), () => "");
     const headExamples =
       template.components.find((c) => c.type === "HEADER")?.example
-        ?.header_text || [];
+        ?.header_text ||
+      Array.from(
+        (template.components.find((c) => c.type === "HEADER")?.text || "").matchAll(
+          /\{\{[^}]+\}\}/g,
+        ),
+        () => "",
+      );
 
     setTemplateDraft(activeConvId, {
       template,
