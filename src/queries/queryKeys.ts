@@ -63,4 +63,13 @@ export const queryKeys = {
     planProducts: (orgId: NullableId) =>
       [orgId, "billing", "plan_products"] as const,
   },
+  tracking: {
+    projects: (orgId: NullableId) => [orgId, "tracking", "projects"] as const,
+    dashboard: (
+      orgId: NullableId,
+      projectId: NullableId,
+      from: string,
+      to: string,
+    ) => [orgId, "tracking", "dashboard", projectId, from, to] as const,
+  },
 };
