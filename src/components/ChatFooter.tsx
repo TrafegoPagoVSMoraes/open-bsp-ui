@@ -490,17 +490,28 @@ export default function ChatFooter() {
                 <X className="w-[24px] h-[24px]" />
               </button>
             ) : (
-              <button
-                disabled={!inCSWindow}
-                className={
-                  "p-[8px] rounded-full" +
-                  (!inCSWindow ? "" : " cursor-pointer hover:bg-accent")
-                }
-                onClick={() => fileInput.current?.click()}
-                title={t("Adjuntar")}
-              >
-                <Plus className="w-[24px] h-[24px]" />
-              </button>
+              <>
+                {conv.service === "whatsapp" && (
+                  <button
+                    className="p-[8px] rounded-full cursor-pointer hover:bg-accent"
+                    onClick={() => toggle("templatePicker", true)}
+                    title={t("Usar plantilla")}
+                  >
+                    <Plus className="w-[24px] h-[24px] rotate-45" />
+                  </button>
+                )}
+                <button
+                  disabled={!inCSWindow}
+                  className={
+                    "p-[8px] rounded-full" +
+                    (!inCSWindow ? "" : " cursor-pointer hover:bg-accent")
+                  }
+                  onClick={() => fileInput.current?.click()}
+                  title={t("Adjuntar")}
+                >
+                  <Plus className="w-[24px] h-[24px]" />
+                </button>
+              </>
             )}
           </div>
 
