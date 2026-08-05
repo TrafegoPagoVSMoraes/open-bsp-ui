@@ -39,6 +39,7 @@ export type TemplateDraft = {
   template: TemplateData;
   bodyVarValues: string[];
   headVarValues: string[];
+  buttonVarValues: string[];
 };
 
 export type Language = "es" | "en" | "pt" | "sw" | "fr";

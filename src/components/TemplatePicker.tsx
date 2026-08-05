@@ -64,11 +64,20 @@ export default function TemplatePicker() {
         ),
         () => "",
       );
+    const buttonExamples =
+      template.components
+        .find((c) => c.type === "BUTTONS")
+        ?.buttons.flatMap((button) =>
+          button.type === "URL" && /\{\{[^}]+\}\}/.test(button.url)
+            ? [button.example?.[0] || ""]
+            : [],
+        ) || [];
 
     setTemplateDraft(activeConvId, {
       template,
       bodyVarValues: bodyExamples.map(() => ""),
       headVarValues: headExamples.map(() => ""),
+      buttonVarValues: buttonExamples,
     });
     toggle("templatePicker", false);
   }
