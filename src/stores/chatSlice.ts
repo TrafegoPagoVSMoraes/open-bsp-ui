@@ -40,6 +40,8 @@ type MediaLoad = {
 export type ChatState = {
   conversations: Map<string, ConversationRow>;
   messages: Map<string, Map<string, MessageRow>>; // TODO: replace the nested maps with a data structure capable of prefix search (a Trie) - cabra 2024/07/26
+  conversationHistoryCursor: string | null;
+  hasMoreConversationHistory: boolean;
   textDrafts: Map<string, string>;
   fileDrafts: Map<string, FileDraft[]>;
   mediaLoads: Map<string, MediaLoad>;
@@ -48,6 +50,10 @@ export type ChatState = {
 export type ChatActions = {
   pushConversations: (convs: ConversationRow[]) => void;
   pushMessages: (msgs: MessageRow[]) => void;
+  setConversationHistoryPagination: (
+    cursor: string | null,
+    hasMore: boolean,
+  ) => void;
   setMediaLoad: (messageId: string, mediaLoad: MediaLoad) => void;
   setConversationTextDraft: (convId: string, textDraft: string) => void;
   setConversationFileDrafts: (convId: string, drafts: FileDraft[]) => void;
@@ -72,6 +78,8 @@ export const createChatSlice: StateCreator<Partial<AppState>> = (
 ) => ({
   conversations: new Map(),
   messages: new Map(),
+  conversationHistoryCursor: null,
+  hasMoreConversationHistory: false,
   textDrafts: new Map(),
   fileDrafts: new Map(),
   mediaLoads: new Map(),
@@ -150,6 +158,14 @@ export const createChatSlice: StateCreator<Partial<AppState>> = (
         },
       };
     }),
+  setConversationHistoryPagination: (cursor: string | null, hasMore: boolean) =>
+    set((state) => ({
+      chat: {
+        ...state.chat,
+        conversationHistoryCursor: cursor,
+        hasMoreConversationHistory: hasMore,
+      },
+    })),
   setMediaLoad: (messageId: string, mediaLoad: MediaLoad) => {
     set((state) => {
       const mediaLoads = new Map(state.chat.mediaLoads);

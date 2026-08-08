@@ -8,6 +8,14 @@ type InitDataResponse = {
   messages: MessageRow[];
 };
 
+function getOldestTimestamp(messages: MessageRow[]): string | null {
+  return messages.reduce<string | null>(
+    (oldest, message) =>
+      !oldest || message.timestamp < oldest ? message.timestamp : oldest,
+    null,
+  );
+}
+
 export const useInitialDataFetch = () => {
   const activeOrgId = useBoundStore((state) => state.ui.activeOrgId);
 
@@ -17,12 +25,17 @@ export const useInitialDataFetch = () => {
     (state) => state.chat.pushConversations,
   );
   const pushMessages = useBoundStore((state) => state.chat.pushMessages);
+  const setConversationHistoryPagination = useBoundStore(
+    (state) => state.chat.setConversationHistoryPagination,
+  );
 
   const PHASE1_LIMIT = 200;
 
   // App init: windowed fetch via RPC (timestamp-based), returns convs + msgs
   const initData = async () => {
     if (!activeOrgId) return;
+
+    setConversationHistoryPagination(null, false);
 
     // Phase 1: recent messages with chat context
     const { data: phase1 } = await supabase
@@ -53,6 +66,15 @@ export const useInitialDataFetch = () => {
       const p2 = phase2 as unknown as InitDataResponse;
       pushConversations(p2.conversations);
       pushMessages(p2.messages);
+      setConversationHistoryPagination(
+        getOldestTimestamp(p2.messages),
+        p2.messages.length >= 100,
+      );
+    } else {
+      setConversationHistoryPagination(
+        getOldestTimestamp(p1.messages),
+        false,
+      );
     }
   };
 

@@ -5,12 +5,30 @@ import { timestampDescending } from "@/stores/chatSlice";
 import { filters, Filters } from "@/stores/uiSlice";
 import Fuse from "fuse.js";
 import { useTranslation } from "@/hooks/useTranslation";
+import { supabase } from "@/supabase/client";
+import { useState } from "react";
+import Spinner from "./Spinner";
 
 export type ConvMetadata = {
   convId: string;
   conv: ConversationRow;
   mostRecentMsg?: MessageRow;
 };
+
+type InitDataResponse = {
+  conversations: ConversationRow[];
+  messages: MessageRow[];
+};
+
+const CONVERSATION_HISTORY_PAGE_SIZE = 100;
+
+function getOldestTimestamp(messages: MessageRow[]): string | null {
+  return messages.reduce<string | null>(
+    (oldest, message) =>
+      !oldest || message.timestamp < oldest ? message.timestamp : oldest,
+    null,
+  );
+}
 
 function pinnedAscending(a: ConversationRow, b: ConversationRow) {
   const aPin = a.extra?.pinned;
@@ -32,6 +50,20 @@ const ChatList = () => {
   const activeOrgId = useBoundStore((state) => state.ui.activeOrgId);
   const conversations = useBoundStore((state) => state.chat.conversations);
   const messages = useBoundStore((state) => state.chat.messages);
+  const conversationHistoryCursor = useBoundStore(
+    (state) => state.chat.conversationHistoryCursor,
+  );
+  const hasMoreConversationHistory = useBoundStore(
+    (state) => state.chat.hasMoreConversationHistory,
+  );
+  const pushConversations = useBoundStore(
+    (state) => state.chat.pushConversations,
+  );
+  const pushMessages = useBoundStore((state) => state.chat.pushMessages);
+  const setConversationHistoryPagination = useBoundStore(
+    (state) => state.chat.setConversationHistoryPagination,
+  );
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const filterName = useBoundStore((state) => state.ui.filter);
   const setFilterName = useBoundStore((state) => state.ui.setFilter);
   const searchPattern = useBoundStore((state) => state.ui.searchPattern);
@@ -74,6 +106,41 @@ const ChatList = () => {
 
   const itemIds = items.map((a) => a.convId);
 
+  const loadOlderConversations = async () => {
+    if (
+      !activeOrgId ||
+      !conversationHistoryCursor ||
+      isLoadingHistory
+    ) {
+      return;
+    }
+
+    setIsLoadingHistory(true);
+
+    try {
+      const { data } = await supabase
+        .rpc("init_data", {
+          p_organization_id: activeOrgId,
+          p_limit: CONVERSATION_HISTORY_PAGE_SIZE,
+          p_per_conversation: 5,
+          p_until: conversationHistoryCursor,
+        })
+        .throwOnError();
+
+      const page = data as unknown as InitDataResponse;
+      pushConversations(page.conversations);
+      pushMessages(page.messages);
+      setConversationHistoryPagination(
+        getOldestTimestamp(page.messages),
+        page.messages.length >= CONVERSATION_HISTORY_PAGE_SIZE,
+      );
+    } catch (error) {
+      console.error("Could not load older conversations", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   return (
     <div className="overflow-y-auto [scrollbar-gutter:stable] w-full h-full pt-[10px] px-[10px]">
       {itemIds.length ? (
@@ -81,6 +148,17 @@ const ChatList = () => {
           {itemIds.map((key) => (
             <ChatListItem key={key} itemId={key} />
           ))}
+          {hasMoreConversationHistory && (
+            <button
+              type="button"
+              className="flex min-h-[40px] items-center justify-center gap-[8px] text-[13px] text-primary disabled:cursor-wait disabled:opacity-60"
+              disabled={isLoadingHistory}
+              onClick={loadOlderConversations}
+            >
+              {isLoadingHistory && <Spinner size={16} />}
+              Ver conversas anteriores
+            </button>
+          )}
         </div>
       ) : (
         <div className="h-full flex items-center justify-center flex-col text-foreground text-[15px] mt-[-24px]">

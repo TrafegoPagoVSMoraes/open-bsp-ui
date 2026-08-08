@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import "dayjs/locale/pt";
@@ -12,9 +12,13 @@ import { useCurrentOrganization } from "@/queries/useOrganizations";
 import { useCurrentAgent } from "@/queries/useAgents";
 import { AVATAR_COLORS } from "@/utils/colors";
 import { markConversationAsRead } from "@/utils/MessageUtils";
+import { supabase } from "@/supabase/client";
+import Spinner from "./Spinner";
 
 type EnvelopeType = { message: MessageRow; first: boolean; last: boolean };
 type SeparatorType = { text: string; first: true; last: true };
+
+const MESSAGE_HISTORY_PAGE_SIZE = 50;
 
 function Separator({ text }: { text: string }) {
   // TODO: just a placeholder
@@ -42,6 +46,7 @@ function Separator({ text }: { text: string }) {
 
 export default function Chat() {
   const activeConvId = useBoundStore((store) => store.ui.activeConvId);
+  const pushMessages = useBoundStore((store) => store.chat.pushMessages);
   const messages = Array.from(
     useBoundStore((store) =>
       store.chat.messages.get(store.ui.activeConvId || ""),
@@ -62,6 +67,15 @@ export default function Chat() {
 
   const scroller = useRef<HTMLDivElement>(null);
   const markingRead = useRef(new Set<string>());
+  const pendingHistoryScroll = useRef<{
+    conversationId: string;
+    height: number;
+    top: number;
+  } | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [exhaustedHistory, setExhaustedHistory] = useState(
+    () => new Set<string>(),
+  );
 
   const { translate: t, currentLanguage } = useTranslation();
 
@@ -206,14 +220,6 @@ export default function Chat() {
    */
 
   useEffect(() => {
-    const scrollerRef = scroller.current;
-
-    if (!scrollerRef || !scroller.current) {
-      return;
-    }
-  }, [messages.length, activeConvId]);
-
-  useEffect(() => {
     if (!activeConvId || markingRead.current.has(activeConvId)) return;
 
     markingRead.current.add(activeConvId);
@@ -222,19 +228,24 @@ export default function Chat() {
     });
   }, [activeConvId, messages.length]);
 
-  useEffect(() => {
-    scrollToBottom(false);
-  }, [activeConvId]);
-
   // Keep the scroll at the bottom when new messages are added
   // prevent the scroll from jumping when the user is reading old messages
-  useEffect(() => {
+  useLayoutEffect(() => {
     const scrollRef = scroller.current;
     if (!scrollRef) {
       return;
     }
+
+    const pendingScroll = pendingHistoryScroll.current;
+    if (pendingScroll?.conversationId === activeConvId) {
+      scrollRef.scrollTop =
+        pendingScroll.top + (scrollRef.scrollHeight - pendingScroll.height);
+      pendingHistoryScroll.current = null;
+      return;
+    }
+
     scrollToBottom();
-  }, [messages.length]);
+  }, [activeConvId, messages.length]);
 
   // Adjust scroll when visual viewport resizes (e.g. mobile keyboard opens)
   useEffect(() => {
@@ -279,6 +290,57 @@ export default function Chat() {
     }
   };
 
+  const loadOlderMessages = async () => {
+    if (!activeConvId || isLoadingHistory) return;
+
+    const oldestMessage = messages.at(-1);
+    setIsLoadingHistory(true);
+
+    try {
+      let query = supabase
+        .from("messages")
+        .select()
+        .eq("conversation_id", activeConvId)
+        .order("timestamp", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(MESSAGE_HISTORY_PAGE_SIZE);
+
+      if (oldestMessage) {
+        query = query.or(
+          `timestamp.lt.${oldestMessage.timestamp},and(timestamp.eq.${oldestMessage.timestamp},created_at.lt.${oldestMessage.created_at}),and(timestamp.eq.${oldestMessage.timestamp},created_at.eq.${oldestMessage.created_at},id.lt.${oldestMessage.id})`,
+        );
+      }
+
+      const { data } = await query.throwOnError();
+      const scrollRef = scroller.current;
+
+      if (
+        data.length > 0 &&
+        scrollRef &&
+        useBoundStore.getState().ui.activeConvId === activeConvId
+      ) {
+        pendingHistoryScroll.current = {
+          conversationId: activeConvId,
+          height: scrollRef.scrollHeight,
+          top: scrollRef.scrollTop,
+        };
+      }
+
+      pushMessages(data);
+
+      if (data.length < MESSAGE_HISTORY_PAGE_SIZE) {
+        setExhaustedHistory((current) =>
+          new Set(current).add(activeConvId),
+        );
+      }
+    } catch (error) {
+      console.error("Could not load older messages", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   return (
     activeConvId && (
       <div
@@ -287,6 +349,17 @@ export default function Chat() {
       >
         <div className="min-h-[12px]" />
         <div className="flex flex-col">
+          {!exhaustedHistory.has(activeConvId) && (
+            <button
+              type="button"
+              className="mb-[12px] flex min-h-[36px] items-center justify-center gap-[8px] text-[13px] text-primary disabled:cursor-wait disabled:opacity-60"
+              disabled={isLoadingHistory}
+              onClick={loadOlderMessages}
+            >
+              {isLoadingHistory && <Spinner size={16} />}
+              Ver mensagens anteriores
+            </button>
+          )}
           {envelopesAndSeparators.map((envOrSep, index) =>
             "message" in envOrSep ? (
               <Message
