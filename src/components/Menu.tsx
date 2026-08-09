@@ -12,6 +12,7 @@ import {
   Languages,
   Plus,
   NotebookTabs,
+  Megaphone,
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { LinkButton } from "./LinkButton";
@@ -77,6 +78,15 @@ export default function Menu() {
           className="mt-[10px]"
         >
           <NotebookTabs className="w-[24px] h-[24px] stroke-[2]" />
+        </LinkButton>
+
+        <LinkButton
+          to="/campaigns"
+          title="Campanhas"
+          isActive={pathname.startsWith("/campaigns")}
+          className="mt-[10px]"
+        >
+          <Megaphone className="w-[24px] h-[24px] stroke-[2]" />
         </LinkButton>
 
         {/* Integrations button */}

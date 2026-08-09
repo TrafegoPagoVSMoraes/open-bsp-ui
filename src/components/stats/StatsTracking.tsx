@@ -4,8 +4,10 @@ import {
   BarChart3,
   CheckCircle2,
   Eye,
+  EyeOff,
   Link2,
   MousePointerClick,
+  Tags,
   Users,
 } from "lucide-react";
 import {
@@ -19,6 +21,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  useTagReport,
   useTrackingDashboard,
   useTrackingProjects,
 } from "@/queries/useTracking";
@@ -52,6 +55,10 @@ function formatTimestamp(value: string) {
       }).format(date);
 }
 
+function safeTagColor(value: string | null) {
+  return value && /^#[0-9a-f]{6}$/i.test(value) ? value : "#64748b";
+}
+
 function MetricCard({
   label,
   value,
@@ -69,8 +76,8 @@ function MetricCard({
     <div className="rounded-[16px] border border-border bg-card p-[18px] shadow-sm">
       <div className="flex items-start justify-between gap-[12px]">
         <div>
-          <p className="text-[13px] text-muted-foreground">{label}</p>
-          <p className="mt-[6px] text-[28px] font-semibold tracking-[-0.03em]">
+          <p className="text-[13px] font-medium text-foreground/80">{label}</p>
+          <p className="mt-[6px] text-[28px] font-semibold tracking-[-0.03em] text-foreground">
             {value}
           </p>
         </div>
@@ -88,7 +95,9 @@ export default function StatsTracking() {
   const [days, setDays] = useState(30);
   const range = useMemo(() => dateRange(days), [days]);
   const projects = useTrackingProjects();
+  const tagReport = useTagReport();
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [showPhoneNumbers, setShowPhoneNumbers] = useState(true);
   const dashboard = useTrackingDashboard(projectId, range.from, range.to);
 
   useEffect(() => {
@@ -101,6 +110,10 @@ export default function StatsTracking() {
 
   const data = dashboard.data;
   const summary = data?.summary;
+  const canTogglePhoneNumbers = Boolean(
+    data?.can_view_pii &&
+      data.recent_activity.some((activity) => activity.contact_address),
+  );
 
   return (
     <div className="flex w-full flex-col gap-[24px] overflow-y-auto p-[24px]">
@@ -111,8 +124,8 @@ export default function StatsTracking() {
               <BarChart3 className="h-[21px] w-[21px]" />
             </div>
             <div>
-              <h2 className="text-[20px] font-semibold">{t("Rastreamento")}</h2>
-              <p className="text-[13px] text-muted-foreground">
+              <h2 className="text-[20px] font-semibold text-foreground">{t("Rastreamento")}</h2>
+              <p className="text-[13px] text-foreground/70">
                 {t("Visão geral de acessos, cliques e conversões")}
               </p>
             </div>
@@ -199,6 +212,57 @@ export default function StatsTracking() {
           tone="bg-emerald-500/10 text-emerald-600"
         />
       </div>
+
+      <section className="rounded-[16px] border border-border bg-card shadow-sm">
+        <div className="flex items-center gap-[10px] border-b border-border px-[18px] py-[14px]">
+          <Tags className="h-[18px] w-[18px] text-primary" />
+          <div>
+            <h3 className="text-[15px] font-semibold text-foreground">
+              {t("Contatos por TAG")}
+            </h3>
+            <p className="text-[12px] text-foreground/70">
+              {t("Distribuição de contatos e opt-outs por etiqueta")}
+            </p>
+          </div>
+        </div>
+        {tagReport.isError ? (
+          <div className="m-[18px] rounded-[12px] border border-amber-500/30 bg-amber-500/10 p-[14px] text-[13px] text-foreground">
+            {tagReport.error instanceof Error
+              ? tagReport.error.message
+              : t("Não foi possível carregar o relatório de TAGs.")}
+          </div>
+        ) : (
+          <div className="grid gap-[10px] p-[18px] sm:grid-cols-2 xl:grid-cols-3">
+            {tagReport.data?.map((tag) => (
+              <div
+                key={tag.tag_id}
+                className="rounded-[12px] border border-border bg-background p-[13px]"
+              >
+                <div className="flex items-center gap-[8px]">
+                  <span
+                    className="h-[10px] w-[10px] rounded-full"
+                    style={{ backgroundColor: safeTagColor(tag.tag_color) }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">
+                    {tag.tag_name}
+                  </span>
+                  <span className="text-[18px] font-semibold text-foreground">
+                    {tag.contact_count.toLocaleString()}
+                  </span>
+                </div>
+                <p className="mt-[5px] text-[11px] text-foreground/65">
+                  {tag.opt_out_count.toLocaleString()} {t("opt-outs")}
+                </p>
+              </div>
+            ))}
+            {!tagReport.isLoading && !tagReport.data?.length ? (
+              <p className="py-[18px] text-[13px] text-foreground/65">
+                {t("Nenhuma TAG com contatos encontrada.")}
+              </p>
+            ) : null}
+          </div>
+        )}
+      </section>
 
       <div className="grid gap-[16px] xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <section className="rounded-[16px] border border-border bg-card p-[18px] shadow-sm">
@@ -299,11 +363,30 @@ export default function StatsTracking() {
       </div>
 
       <section className="rounded-[16px] border border-border bg-card shadow-sm">
-        <div className="border-b border-border px-[18px] py-[14px]">
-          <h3 className="text-[15px] font-medium">{t("Atividade recente")}</h3>
-          <p className="text-[12px] text-muted-foreground">
-            {t("Os contatos aparecem mascarados; nenhum token é exibido.")}
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-[12px] border-b border-border px-[18px] py-[14px]">
+          <div>
+            <h3 className="text-[15px] font-semibold text-foreground">{t("Atividade recente")}</h3>
+            <p className="text-[12px] text-foreground/70">
+              {data?.can_view_pii
+                ? t("Telefones disponíveis somente nesta área autenticada.")
+                : t("Os contatos permanecem mascarados por permissão.")}
+            </p>
+          </div>
+          {canTogglePhoneNumbers ? (
+            <button
+              type="button"
+              className="inline-flex h-[36px] items-center gap-[7px] rounded-[10px] border border-border bg-background px-[11px] text-[12px] font-medium text-foreground hover:bg-muted"
+              onClick={() => setShowPhoneNumbers((current) => !current)}
+              aria-pressed={showPhoneNumbers}
+            >
+              {showPhoneNumbers ? (
+                <EyeOff className="h-[15px] w-[15px]" />
+              ) : (
+                <Eye className="h-[15px] w-[15px]" />
+              )}
+              {showPhoneNumbers ? t("Ocultar números") : t("Mostrar números")}
+            </button>
+          ) : null}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-[12px]">
@@ -347,7 +430,11 @@ export default function StatsTracking() {
                     {activity.page_path ?? "—"}
                   </td>
                   <td className="px-[18px] py-[11px] text-right font-mono">
-                    {activity.contact_address_masked ?? t("Anônimo")}
+                    {data?.can_view_pii &&
+                    showPhoneNumbers &&
+                    activity.contact_address
+                      ? activity.contact_address
+                      : activity.contact_address_masked ?? t("Anônimo")}
                   </td>
                 </tr>
               ))}

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import SectionHeader from "@/components/SectionHeader";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useCreateContact } from "@/queries/useContacts";
-import { useForm, useFieldArray } from "react-hook-form";
+import { Controller, useForm, useFieldArray } from "react-hook-form";
 import SectionBody from "@/components/SectionBody";
 import SectionFooter from "@/components/SectionFooter";
 import Button from "@/components/Button";
@@ -10,6 +10,10 @@ import { Plus, X } from "lucide-react";
 import type { ContactWithAddressesInsert } from "@/supabase/client";
 import { isValidPhoneNumber } from "@/utils/FormatUtils";
 import FieldError from "@/components/FieldError";
+import TagSelector from "@/components/TagSelector";
+import { useSetContactTags } from "@/queries/useTags";
+
+type ContactFormValues = ContactWithAddressesInsert & { tag_ids: string[] };
 
 export const Route = createFileRoute("/_auth/contacts/new")({
   component: ContactNew,
@@ -19,16 +23,18 @@ function ContactNew() {
   const { translate: t } = useTranslation();
   const navigate = useNavigate();
   const createContact = useCreateContact();
+  const setContactTags = useSetContactTags();
 
   const {
     register,
     handleSubmit,
     control,
     formState: { isValid, isDirty, errors },
-  } = useForm<ContactWithAddressesInsert>({
+  } = useForm<ContactFormValues>({
     mode: "onTouched",
     defaultValues: {
       addresses: [{ address: "" }],
+      tag_ids: [],
     },
   });
 
@@ -44,15 +50,17 @@ function ContactNew() {
       <SectionBody>
         <form
           id="contact-form"
-          onSubmit={handleSubmit((data) =>
-            createContact.mutate(data, {
-              onSuccess: (contact) =>
-                navigate({
-                  to: `/contacts/${contact.id}`,
-                  hash: (prevHash) => prevHash!,
-                }),
-            }),
-          )}
+          onSubmit={handleSubmit(async ({ tag_ids, ...data }) => {
+            const contact = await createContact.mutateAsync(data);
+            await setContactTags.mutateAsync({
+              contactId: contact.id,
+              tagIds: tag_ids,
+            });
+            navigate({
+              to: `/contacts/${contact.id}`,
+              hash: (prevHash) => prevHash!,
+            });
+          })}
         >
           <label>
             <div className="label">{t("Nombre")}</div>
@@ -63,6 +71,24 @@ function ContactNew() {
               {...register("name")}
             />
           </label>
+
+          <label>
+            <div className="label">{t("E-mail")}</div>
+            <input
+              type="email"
+              className="text"
+              placeholder="nome@exemplo.com"
+              {...register("extra.email")}
+            />
+          </label>
+
+          <Controller
+            name="tag_ids"
+            control={control}
+            render={({ field }) => (
+              <TagSelector value={field.value ?? []} onChange={field.onChange} />
+            )}
+          />
 
           {fields.map((field, idx) => (
             <label key={field.id}>
@@ -111,7 +137,7 @@ function ContactNew() {
           form="contact-form"
           type="submit"
           invalid={!isValid || !isDirty}
-          loading={createContact.isPending}
+          loading={createContact.isPending || setContactTags.isPending}
           className="primary"
         >
           {t("Crear")}

@@ -75,7 +75,9 @@ export type ConversationExtra = {
   } | null;
 };
 
-export type ContactExtra = Record<PropertyKey, never>;
+export type ContactExtra = {
+  email?: string;
+};
 
 export type WhatsAppContactAddressExtra = {
   name?: string;

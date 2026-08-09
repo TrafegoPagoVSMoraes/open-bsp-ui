@@ -7,6 +7,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useContactByAddress } from "@/queries/useContacts";
 import { useContactAddress } from "@/queries/useContactsAddresses";
 import type { InstagramContactAddressExtra } from "@/supabase/client";
+import TagSelector from "./TagSelector";
+import { useContactTags, useSetContactTags } from "@/queries/useTags";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -25,6 +27,8 @@ export default function Header() {
     conversation?.contact_address,
     conversation?.service,
   );
+  const { data: contactTags } = useContactTags(contact?.id);
+  const setContactTags = useSetContactTags();
 
   const service = conversation?.service;
   // Group conversations (whatsapp-web) have group_address set and no
@@ -103,6 +107,16 @@ export default function Header() {
             `@${igExtra.username}`}
         </div>
       </div>
+
+      {contact && (
+        <TagSelector
+          compact
+          value={contactTags.map((tag) => tag.id)}
+          onChange={(tagIds) =>
+            setContactTags.mutate({ contactId: contact.id, tagIds })
+          }
+        />
+      )}
 
       {/* Options button - Hidden, does nothing yet. */}
       <div className="options flex justify-end w-full hidden">

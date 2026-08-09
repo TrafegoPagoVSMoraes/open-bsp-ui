@@ -8,7 +8,10 @@ import {
   type WhatsAppContactAddressExtra,
 } from "@/supabase/client";
 import useBoundStore from "@/stores/useBoundStore";
-import { normalizePhoneNumber } from "@/utils/FormatUtils";
+import {
+  normalizePersonName,
+  normalizePhoneNumber,
+} from "@/utils/FormatUtils";
 import { queryKeys } from "./queryKeys";
 import type { Database } from "@/supabase/db_types";
 
@@ -113,11 +116,21 @@ export function useCreateContact() {
       if (!orgId) throw new Error("No active organization");
 
       const { addresses, ...contactData } = data;
+      const normalizedContactData = {
+        ...contactData,
+        name: normalizePersonName(contactData.name) || null,
+        extra: contactData.extra
+          ? {
+              ...contactData.extra,
+              email: contactData.extra.email?.trim().toLocaleLowerCase(),
+            }
+          : contactData.extra,
+      };
 
       // Create contact
       const { data: contact } = await supabase
         .from("contacts")
-        .insert({ ...contactData, organization_id: orgId })
+        .insert({ ...normalizedContactData, organization_id: orgId })
         .select()
         .single()
         .throwOnError();
@@ -171,10 +184,23 @@ export function useUpdateContact() {
       if (!data.id) throw new Error("No contact id");
 
       const { addresses: rawNewAddresses, ...newContact } = data;
+      const normalizedContact = {
+        ...newContact,
+        name:
+          newContact.name === undefined
+            ? undefined
+            : normalizePersonName(newContact.name) || null,
+        extra: newContact.extra
+          ? {
+              ...newContact.extra,
+              email: newContact.extra.email?.trim().toLocaleLowerCase(),
+            }
+          : newContact.extra,
+      };
 
       const { data: contact } = await supabase
         .from("contacts")
-        .update(newContact)
+        .update(normalizedContact)
         .eq("id", data.id)
         .select()
         .single()

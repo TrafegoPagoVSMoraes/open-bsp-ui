@@ -71,5 +71,13 @@ export const queryKeys = {
       from: string,
       to: string,
     ) => [orgId, "tracking", "dashboard", projectId, from, to] as const,
+    tags: (orgId: NullableId) => [orgId, "tracking", "tags"] as const,
+  },
+  tags: {
+    all: (orgId: NullableId) => [orgId, "tags"] as const,
+    assignments: (orgId: NullableId) =>
+      [orgId, "contact_tags"] as const,
+    contact: (orgId: NullableId, contactId: NullableId) =>
+      [orgId, "contact_tags", contactId] as const,
   },
 };

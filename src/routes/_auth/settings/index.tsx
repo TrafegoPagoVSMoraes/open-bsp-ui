@@ -3,7 +3,7 @@ import SectionHeader from "@/components/SectionHeader";
 import SectionItem from "@/components/SectionItem";
 import { useTranslation } from "@/hooks/useTranslation";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Building2, Users, Webhook, Key } from "lucide-react";
+import { Building2, Users, Webhook, Key, Tags } from "lucide-react";
 
 export const Route = createFileRoute("/_auth/settings/")({
   component: SettingsIndex,
@@ -19,6 +19,11 @@ function SettingsIndex() {
 
       <SectionBody className="gap-4">
         <div className="flex flex-col">
+          <SectionItem
+            title="Tags"
+            aside={<div className="p-[8px]"><Tags className="w-[24px] h-[24px] text-muted-foreground" /></div>}
+            onClick={() => navigate({ to: "/settings/tags", hash: (prevHash) => prevHash! })}
+          />
           <SectionItem
             title={t("Organización")}
             aside={

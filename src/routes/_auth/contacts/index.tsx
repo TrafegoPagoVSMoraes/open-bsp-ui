@@ -10,6 +10,7 @@ import Avatar from "@/components/Avatar";
 import { formatPhoneNumber } from "@/utils/FormatUtils";
 import SearchBar from "@/components/SearchBar";
 import Fuse from "fuse.js";
+import { useContactTagAssignments, useTags } from "@/queries/useTags";
 
 export const Route = createFileRoute("/_auth/contacts/")({
   component: ListContacts,
@@ -20,6 +21,9 @@ function ListContacts() {
   const navigate = useNavigate();
   const { data: contacts } = useContacts();
   const [search, setSearch] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  const { data: tags = [] } = useTags();
+  const { data: assignments = [] } = useContactTagAssignments();
 
   let filtered = contacts ?? [];
   if (search) {
@@ -28,6 +32,14 @@ function ListContacts() {
       keys: ["name", "addresses.address"],
     });
     filtered = fuse.search(search).map((r) => r.item);
+  }
+  if (tagFilter) {
+    const taggedContactIds = new Set(
+      assignments
+        .filter((assignment) => assignment.tag_id === tagFilter)
+        .map((assignment) => assignment.contact_id),
+    );
+    filtered = filtered.filter((contact) => taggedContactIds.has(contact.id));
   }
 
   return (
@@ -39,6 +51,20 @@ function ListContacts() {
         onChange={setSearch}
         placeholder={t("Buscar contactos")}
       />
+
+      <div className="px-[20px] pb-2">
+        <select
+          value={tagFilter}
+          onChange={(event) => setTagFilter(event.target.value)}
+        >
+          <option value="">Todas as tags</option>
+          {tags.map((tag) => (
+            <option key={tag.id} value={tag.id}>
+              {tag.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <SectionBody>
         <SectionItem

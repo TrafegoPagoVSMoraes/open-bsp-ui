@@ -81,6 +81,17 @@ export type Database = MergeDeep<
   DatabaseGeneratedWithoutAgents,
   {
     public: {
+      Functions: {
+        get_tracking_dashboard_private: {
+          Args: {
+            p_organization_id: string;
+            p_project_id?: string;
+            p_from?: string;
+            p_to?: string;
+          };
+          Returns: Json;
+        };
+      };
       Tables: {
         organizations: {
           Row: { extra: OrganizationExtra | null };
@@ -147,6 +158,66 @@ export type Database = MergeDeep<
           Insert: { extra?: ContactAddressExtra | null };
           Update: { extra?: ContactAddressExtra | null };
         };
+        tags: {
+          Row: {
+            id: string;
+            organization_id: string;
+            name: string;
+            slug: string;
+            color: string;
+            description: string | null;
+            system_key: string | null;
+            created_at: string;
+            updated_at: string;
+          };
+          Insert: {
+            id?: string;
+            organization_id: string;
+            name: string;
+            slug?: string;
+            color?: string;
+            description?: string | null;
+            system_key?: string | null;
+            created_at?: string;
+            updated_at?: string;
+          };
+          Update: {
+            id?: string;
+            organization_id?: string;
+            name?: string;
+            slug?: string;
+            color?: string;
+            description?: string | null;
+            system_key?: string | null;
+            created_at?: string;
+            updated_at?: string;
+          };
+          Relationships: [];
+        };
+        contact_tags: {
+          Row: {
+            organization_id: string;
+            contact_id: string;
+            tag_id: string;
+            source: string;
+            created_at: string;
+          };
+          Insert: {
+            organization_id: string;
+            contact_id: string;
+            tag_id: string;
+            source?: string;
+            created_at?: string;
+          };
+          Update: {
+            organization_id?: string;
+            contact_id?: string;
+            tag_id?: string;
+            source?: string;
+            created_at?: string;
+          };
+          Relationships: [];
+        };
         agents: {
           Row: AgentRowStrict;
           Insert: AgentInsertStrict;
@@ -196,6 +267,12 @@ export type ContactWithAddressesInsert = ContactInsert & {
 export type ContactWithAddressesUpdate = ContactUpdate & {
   addresses: ContactAddressUpdate[];
 };
+
+export type TagRow = Database["public"]["Tables"]["tags"]["Row"];
+export type TagInsert = Database["public"]["Tables"]["tags"]["Insert"];
+export type TagUpdate = Database["public"]["Tables"]["tags"]["Update"];
+export type ContactTagRow =
+  Database["public"]["Tables"]["contact_tags"]["Row"];
 
 export type AgentRow = Database["public"]["Tables"]["agents"]["Row"];
 export type AgentInsert = Database["public"]["Tables"]["agents"]["Insert"];

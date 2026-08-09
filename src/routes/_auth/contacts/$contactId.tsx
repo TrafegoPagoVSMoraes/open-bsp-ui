@@ -6,7 +6,7 @@ import {
   useDeleteContact,
   useUpdateContact,
 } from "@/queries/useContacts";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import SectionBody from "@/components/SectionBody";
 import SectionFooter from "@/components/SectionFooter";
 import Button from "@/components/Button";
@@ -18,6 +18,10 @@ import type {
 } from "@/supabase/client";
 import { formatPhoneNumber, isValidPhoneNumber } from "@/utils/FormatUtils";
 import FieldError from "@/components/FieldError";
+import TagSelector from "@/components/TagSelector";
+import { useContactTags, useSetContactTags } from "@/queries/useTags";
+
+type ContactFormValues = ContactWithAddressesUpdate & { tag_ids: string[] };
 
 export const Route = createFileRoute("/_auth/contacts/$contactId")({
   component: ContactDetail,
@@ -30,6 +34,8 @@ function ContactDetail() {
   const { data: contact } = useContact(contactId);
   const deleteContact = useDeleteContact();
   const updateContact = useUpdateContact();
+  const setContactTags = useSetContactTags();
+  const { data: contactTags } = useContactTags(contactId);
 
   // Track original addresses (these will be readonly)
   const originalAddresses = useMemo(
@@ -42,9 +48,11 @@ function ContactDetail() {
     handleSubmit,
     control,
     formState: { isDirty, isValid, errors },
-  } = useForm<ContactWithAddressesUpdate>({
+  } = useForm<ContactFormValues>({
     mode: "onTouched",
-    values: contact,
+    values: contact
+      ? { ...contact, tag_ids: contactTags.map((tag) => tag.id) }
+      : undefined,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -69,7 +77,13 @@ function ContactDetail() {
         <SectionBody>
           <form
             id="contact-form"
-            onSubmit={handleSubmit((data) => updateContact.mutate(data))}
+            onSubmit={handleSubmit(async ({ tag_ids, ...data }) => {
+              await updateContact.mutateAsync(data);
+              await setContactTags.mutateAsync({
+                contactId,
+                tagIds: tag_ids,
+              });
+            })}
           >
             <label>
               <div className="label">{t("Nombre")}</div>
@@ -80,6 +94,27 @@ function ContactDetail() {
                 {...register("name")}
               />
             </label>
+
+            <label>
+              <div className="label">{t("E-mail")}</div>
+              <input
+                type="email"
+                className="text"
+                placeholder="nome@exemplo.com"
+                {...register("extra.email")}
+              />
+            </label>
+
+            <Controller
+              name="tag_ids"
+              control={control}
+              render={({ field }) => (
+                <TagSelector
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                />
+              )}
+            />
 
             {fields.map((field, idx) => {
               const isExisting = originalAddresses.has(field.address ?? "");
@@ -148,7 +183,7 @@ function ContactDetail() {
             form="contact-form"
             type="submit"
             invalid={!isValid || !isDirty}
-            loading={updateContact.isPending}
+            loading={updateContact.isPending || setContactTags.isPending}
             className="primary"
           >
             {t("Actualizar")}

@@ -1,4 +1,4 @@
-import { parsePhoneNumberWithError } from "libphonenumber-js";
+import { parsePhoneNumberWithError } from "libphonenumber-js/max";
 
 export function removeAccents(str: string): string {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -80,4 +80,33 @@ export function normalizePhoneNumber(phoneNumber: string): string {
     // Return cleaned version (digits only) if parsing fails
     return phoneNumber.replace(/\D/g, "");
   }
+}
+
+const LOWERCASE_NAME_PARTICLES = new Set([
+  "da",
+  "das",
+  "de",
+  "do",
+  "dos",
+  "e",
+]);
+
+/** Normalizes whitespace and Portuguese person-name casing without removing accents. */
+export function normalizePersonName(name: string | null | undefined): string {
+  const words = (name ?? "").trim().replace(/\s+/g, " ").split(" ");
+
+  return words
+    .filter(Boolean)
+    .map((word, index) => {
+      const lower = word.toLocaleLowerCase("pt-BR");
+      if (index > 0 && LOWERCASE_NAME_PARTICLES.has(lower)) return lower;
+
+      return lower
+        .split("-")
+        .map((part) =>
+          part ? part.charAt(0).toLocaleUpperCase("pt-BR") + part.slice(1) : part,
+        )
+        .join("-");
+    })
+    .join(" ");
 }

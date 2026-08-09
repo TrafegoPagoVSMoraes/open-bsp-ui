@@ -49,6 +49,7 @@ export type TrackingActivityRow = {
   page_path: string | null;
   occurred_at: string;
   contact_address_masked: string | null;
+  contact_address: string | null;
 };
 
 export type TrackingDashboard = {
@@ -56,8 +57,17 @@ export type TrackingDashboard = {
   series: TrackingSeriesRow[];
   top_events: TrackingEventRow[];
   recent_activity: TrackingActivityRow[];
+  can_view_pii: boolean;
   from: string;
   to: string;
+};
+
+export type TagReportRow = {
+  tag_id: string;
+  tag_name: string;
+  tag_color: string | null;
+  contact_count: number;
+  opt_out_count: number;
 };
 
 const EMPTY_SUMMARY: TrackingSummary = {
@@ -96,6 +106,7 @@ function rows(value: Json | undefined) {
 function normalizeDashboard(value: Json | null): TrackingDashboard {
   const root = record(value ?? undefined);
   const summary = record(root.summary);
+  const permissions = record(root.permissions);
   return {
     summary: {
       ...EMPTY_SUMMARY,
@@ -130,10 +141,33 @@ function normalizeDashboard(value: Json | null): TrackingDashboard {
       page_path: nullableString(row.page_path),
       occurred_at: string(row.occurred_at),
       contact_address_masked: nullableString(row.contact_address_masked),
+      contact_address: nullableString(row.contact_address),
     })),
+    can_view_pii:
+      root.can_view_pii === true || permissions.can_view_pii === true,
     from: string(root.from),
     to: string(root.to),
   };
+}
+
+function normalizeTagReport(value: unknown): TagReportRow[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const row = item as Record<string, unknown>;
+    if (typeof row.tag_id !== "string" || typeof row.tag_name !== "string") {
+      return [];
+    }
+
+    return [{
+      tag_id: row.tag_id,
+      tag_name: row.tag_name,
+      tag_color: typeof row.tag_color === "string" ? row.tag_color : null,
+      contact_count: Number(row.contact_count ?? 0) || 0,
+      opt_out_count: Number(row.opt_out_count ?? 0) || 0,
+    }];
+  });
 }
 
 export function useTrackingProjects() {
@@ -168,7 +202,7 @@ export function useTrackingDashboard(
     enabled: !!organizationId,
     queryFn: async () => {
       if (!organizationId) return normalizeDashboard(null);
-      const { data, error } = await supabase.rpc("get_tracking_dashboard", {
+      const { data, error } = await supabase.rpc("get_tracking_dashboard_private", {
         p_organization_id: organizationId,
         p_project_id: projectId ?? undefined,
         p_from: from,
@@ -176,6 +210,36 @@ export function useTrackingDashboard(
       });
       if (error) throw error;
       return normalizeDashboard(data);
+    },
+  });
+}
+
+export function useTagReport() {
+  const organizationId = useBoundStore((state) => state.ui.activeOrgId);
+
+  return useQuery({
+    queryKey: queryKeys.tracking.tags(organizationId),
+    enabled: !!organizationId,
+    queryFn: async () => {
+      if (!organizationId) return [];
+
+      // This RPC is organization-scoped and enforces membership in the database.
+      // Keep the cast local until generated Supabase types include the new RPC.
+      const rpc = supabase.rpc.bind(supabase) as unknown as (
+        name: "get_tag_report",
+        args: { p_organization_id: string },
+      ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+      const { data, error } = await rpc("get_tag_report", {
+        p_organization_id: organizationId,
+      });
+
+      if (error) {
+        throw new Error(
+          `Relatório de TAGs indisponível: ${error.message}`,
+        );
+      }
+
+      return normalizeTagReport(data);
     },
   });
 }

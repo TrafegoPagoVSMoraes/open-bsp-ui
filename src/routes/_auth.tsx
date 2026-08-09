@@ -41,6 +41,7 @@ function AppLayout() {
   const location = useLocation();
   const pathname = location.pathname;
   const isStatsRoute = pathname.startsWith("/stats");
+  const isCampaignRoute = pathname.startsWith("/campaigns");
 
   const [isHoveringFiles, setIsHoveringFiles] = useState(false);
 
@@ -65,6 +66,20 @@ function AppLayout() {
   console.log("active conv", activeConvId);
 
   const showCenterPanel = activeConvId || isStatsRoute;
+
+  if (isCampaignRoute) {
+    return (
+      <div
+        className="grid h-full"
+        style={{ gridTemplateColumns: `${getMenuWidth()}px minmax(0, 1fr)` }}
+      >
+        <Menu />
+        <div className="min-w-0 overflow-hidden">
+          <Outlet />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
