@@ -67,9 +67,17 @@ function detectLanguage(): Language {
 }
 
 const initialLang = detectLanguage();
-await loadTranslations(initialLang);
+const rootElement = document.getElementById("root");
 
-createRoot(document.getElementById("root")!).render(
+if (!rootElement) throw new Error("OpenBSP root element was not found");
+
+// Translation files improve subsequent renders, but a slow or unavailable
+// locale request must never prevent the application from mounting.
+void loadTranslations(initialLang).catch((error) =>
+  console.error("Could not preload translations", error)
+);
+
+createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <TickProvider>

@@ -18,6 +18,7 @@ import { Route as OauthCallbackRouteImport } from './routes/oauth/callback'
 import { Route as AuthStatsRouteImport } from './routes/_auth/stats'
 import { Route as AuthStatsIndexRouteImport } from './routes/_auth/stats/index'
 import { Route as AuthSettingsIndexRouteImport } from './routes/_auth/settings/index'
+import { Route as AuthProjectsIndexRouteImport } from './routes/_auth/projects/index'
 import { Route as AuthIntegrationsIndexRouteImport } from './routes/_auth/integrations/index'
 import { Route as AuthConversationsIndexRouteImport } from './routes/_auth/conversations/index'
 import { Route as AuthContactsIndexRouteImport } from './routes/_auth/contacts/index'
@@ -39,6 +40,7 @@ import { Route as AuthSettingsWebhooksIndexRouteImport } from './routes/_auth/se
 import { Route as AuthSettingsTagsIndexRouteImport } from './routes/_auth/settings/tags/index'
 import { Route as AuthSettingsOrganizationIndexRouteImport } from './routes/_auth/settings/organization/index'
 import { Route as AuthSettingsMembersIndexRouteImport } from './routes/_auth/settings/members/index'
+import { Route as AuthSettingsExpertsIndexRouteImport } from './routes/_auth/settings/experts/index'
 import { Route as AuthSettingsApiKeysIndexRouteImport } from './routes/_auth/settings/api-keys/index'
 import { Route as AuthIntegrationsWhatsappIndexRouteImport } from './routes/_auth/integrations/whatsapp/index'
 import { Route as AuthIntegrationsWhatsappWebIndexRouteImport } from './routes/_auth/integrations/whatsapp-web/index'
@@ -108,6 +110,11 @@ const AuthStatsIndexRoute = AuthStatsIndexRouteImport.update({
 const AuthSettingsIndexRoute = AuthSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthProjectsIndexRoute = AuthProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
   getParentRoute: () => AuthRoute,
 } as any)
 const AuthIntegrationsIndexRoute = AuthIntegrationsIndexRouteImport.update({
@@ -218,6 +225,12 @@ const AuthSettingsMembersIndexRoute =
   AuthSettingsMembersIndexRouteImport.update({
     id: '/settings/members/',
     path: '/settings/members/',
+    getParentRoute: () => AuthRoute,
+  } as any)
+const AuthSettingsExpertsIndexRoute =
+  AuthSettingsExpertsIndexRouteImport.update({
+    id: '/settings/experts/',
+    path: '/settings/experts/',
     getParentRoute: () => AuthRoute,
   } as any)
 const AuthSettingsApiKeysIndexRoute =
@@ -398,6 +411,7 @@ export interface FileRoutesByFullPath {
   '/contacts': typeof AuthContactsIndexRoute
   '/conversations': typeof AuthConversationsIndexRoute
   '/integrations': typeof AuthIntegrationsIndexRoute
+  '/projects': typeof AuthProjectsIndexRoute
   '/settings': typeof AuthSettingsIndexRoute
   '/stats/': typeof AuthStatsIndexRoute
   '/integrations/instagram/new': typeof AuthIntegrationsInstagramNewRoute
@@ -414,6 +428,7 @@ export interface FileRoutesByFullPath {
   '/integrations/whatsapp-web': typeof AuthIntegrationsWhatsappWebIndexRoute
   '/integrations/whatsapp': typeof AuthIntegrationsWhatsappIndexRoute
   '/settings/api-keys': typeof AuthSettingsApiKeysIndexRoute
+  '/settings/experts': typeof AuthSettingsExpertsIndexRoute
   '/settings/members': typeof AuthSettingsMembersIndexRoute
   '/settings/organization': typeof AuthSettingsOrganizationIndexRoute
   '/settings/tags': typeof AuthSettingsTagsIndexRoute
@@ -454,6 +469,7 @@ export interface FileRoutesByTo {
   '/contacts': typeof AuthContactsIndexRoute
   '/conversations': typeof AuthConversationsIndexRoute
   '/integrations': typeof AuthIntegrationsIndexRoute
+  '/projects': typeof AuthProjectsIndexRoute
   '/settings': typeof AuthSettingsIndexRoute
   '/stats': typeof AuthStatsIndexRoute
   '/integrations/instagram/new': typeof AuthIntegrationsInstagramNewRoute
@@ -470,6 +486,7 @@ export interface FileRoutesByTo {
   '/integrations/whatsapp-web': typeof AuthIntegrationsWhatsappWebIndexRoute
   '/integrations/whatsapp': typeof AuthIntegrationsWhatsappIndexRoute
   '/settings/api-keys': typeof AuthSettingsApiKeysIndexRoute
+  '/settings/experts': typeof AuthSettingsExpertsIndexRoute
   '/settings/members': typeof AuthSettingsMembersIndexRoute
   '/settings/organization': typeof AuthSettingsOrganizationIndexRoute
   '/settings/tags': typeof AuthSettingsTagsIndexRoute
@@ -513,6 +530,7 @@ export interface FileRoutesById {
   '/_auth/contacts/': typeof AuthContactsIndexRoute
   '/_auth/conversations/': typeof AuthConversationsIndexRoute
   '/_auth/integrations/': typeof AuthIntegrationsIndexRoute
+  '/_auth/projects/': typeof AuthProjectsIndexRoute
   '/_auth/settings/': typeof AuthSettingsIndexRoute
   '/_auth/stats/': typeof AuthStatsIndexRoute
   '/_auth/integrations/instagram/new': typeof AuthIntegrationsInstagramNewRoute
@@ -529,6 +547,7 @@ export interface FileRoutesById {
   '/_auth/integrations/whatsapp-web/': typeof AuthIntegrationsWhatsappWebIndexRoute
   '/_auth/integrations/whatsapp/': typeof AuthIntegrationsWhatsappIndexRoute
   '/_auth/settings/api-keys/': typeof AuthSettingsApiKeysIndexRoute
+  '/_auth/settings/experts/': typeof AuthSettingsExpertsIndexRoute
   '/_auth/settings/members/': typeof AuthSettingsMembersIndexRoute
   '/_auth/settings/organization/': typeof AuthSettingsOrganizationIndexRoute
   '/_auth/settings/tags/': typeof AuthSettingsTagsIndexRoute
@@ -572,6 +591,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/conversations'
     | '/integrations'
+    | '/projects'
     | '/settings'
     | '/stats/'
     | '/integrations/instagram/new'
@@ -588,6 +608,7 @@ export interface FileRouteTypes {
     | '/integrations/whatsapp-web'
     | '/integrations/whatsapp'
     | '/settings/api-keys'
+    | '/settings/experts'
     | '/settings/members'
     | '/settings/organization'
     | '/settings/tags'
@@ -628,6 +649,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/conversations'
     | '/integrations'
+    | '/projects'
     | '/settings'
     | '/stats'
     | '/integrations/instagram/new'
@@ -644,6 +666,7 @@ export interface FileRouteTypes {
     | '/integrations/whatsapp-web'
     | '/integrations/whatsapp'
     | '/settings/api-keys'
+    | '/settings/experts'
     | '/settings/members'
     | '/settings/organization'
     | '/settings/tags'
@@ -686,6 +709,7 @@ export interface FileRouteTypes {
     | '/_auth/contacts/'
     | '/_auth/conversations/'
     | '/_auth/integrations/'
+    | '/_auth/projects/'
     | '/_auth/settings/'
     | '/_auth/stats/'
     | '/_auth/integrations/instagram/new'
@@ -702,6 +726,7 @@ export interface FileRouteTypes {
     | '/_auth/integrations/whatsapp-web/'
     | '/_auth/integrations/whatsapp/'
     | '/_auth/settings/api-keys/'
+    | '/_auth/settings/experts/'
     | '/_auth/settings/members/'
     | '/_auth/settings/organization/'
     | '/_auth/settings/tags/'
@@ -794,6 +819,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthSettingsIndexRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/projects/': {
+      id: '/_auth/projects/'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof AuthProjectsIndexRouteImport
       parentRoute: typeof AuthRoute
     }
     '/_auth/integrations/': {
@@ -941,6 +973,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/members'
       fullPath: '/settings/members'
       preLoaderRoute: typeof AuthSettingsMembersIndexRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/settings/experts/': {
+      id: '/_auth/settings/experts/'
+      path: '/settings/experts'
+      fullPath: '/settings/experts'
+      preLoaderRoute: typeof AuthSettingsExpertsIndexRouteImport
       parentRoute: typeof AuthRoute
     }
     '/_auth/settings/api-keys/': {
@@ -1160,6 +1199,7 @@ interface AuthRouteChildren {
   AuthContactsIndexRoute: typeof AuthContactsIndexRoute
   AuthConversationsIndexRoute: typeof AuthConversationsIndexRoute
   AuthIntegrationsIndexRoute: typeof AuthIntegrationsIndexRoute
+  AuthProjectsIndexRoute: typeof AuthProjectsIndexRoute
   AuthSettingsIndexRoute: typeof AuthSettingsIndexRoute
   AuthIntegrationsInstagramNewRoute: typeof AuthIntegrationsInstagramNewRoute
   AuthIntegrationsWhatsappWebNewRoute: typeof AuthIntegrationsWhatsappWebNewRoute
@@ -1175,6 +1215,7 @@ interface AuthRouteChildren {
   AuthIntegrationsWhatsappWebIndexRoute: typeof AuthIntegrationsWhatsappWebIndexRoute
   AuthIntegrationsWhatsappIndexRoute: typeof AuthIntegrationsWhatsappIndexRoute
   AuthSettingsApiKeysIndexRoute: typeof AuthSettingsApiKeysIndexRoute
+  AuthSettingsExpertsIndexRoute: typeof AuthSettingsExpertsIndexRoute
   AuthSettingsMembersIndexRoute: typeof AuthSettingsMembersIndexRoute
   AuthSettingsOrganizationIndexRoute: typeof AuthSettingsOrganizationIndexRoute
   AuthSettingsTagsIndexRoute: typeof AuthSettingsTagsIndexRoute
@@ -1208,6 +1249,7 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthContactsIndexRoute: AuthContactsIndexRoute,
   AuthConversationsIndexRoute: AuthConversationsIndexRoute,
   AuthIntegrationsIndexRoute: AuthIntegrationsIndexRoute,
+  AuthProjectsIndexRoute: AuthProjectsIndexRoute,
   AuthSettingsIndexRoute: AuthSettingsIndexRoute,
   AuthIntegrationsInstagramNewRoute: AuthIntegrationsInstagramNewRoute,
   AuthIntegrationsWhatsappWebNewRoute: AuthIntegrationsWhatsappWebNewRoute,
@@ -1223,6 +1265,7 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthIntegrationsWhatsappWebIndexRoute: AuthIntegrationsWhatsappWebIndexRoute,
   AuthIntegrationsWhatsappIndexRoute: AuthIntegrationsWhatsappIndexRoute,
   AuthSettingsApiKeysIndexRoute: AuthSettingsApiKeysIndexRoute,
+  AuthSettingsExpertsIndexRoute: AuthSettingsExpertsIndexRoute,
   AuthSettingsMembersIndexRoute: AuthSettingsMembersIndexRoute,
   AuthSettingsOrganizationIndexRoute: AuthSettingsOrganizationIndexRoute,
   AuthSettingsTagsIndexRoute: AuthSettingsTagsIndexRoute,

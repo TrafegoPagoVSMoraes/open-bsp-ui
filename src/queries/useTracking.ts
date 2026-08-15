@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import useBoundStore from "@/stores/useBoundStore";
 import { supabase } from "@/supabase/client";
 import type { Json } from "@/supabase/db_types";
@@ -211,6 +211,39 @@ export function useTrackingDashboard(
       if (error) throw error;
       return normalizeDashboard(data);
     },
+  });
+}
+
+export function useTrackingActivity(
+  projectId: string | null,
+  from: string,
+  to: string,
+) {
+  const organizationId = useBoundStore((state) => state.ui.activeOrgId);
+  const pageSize = 100;
+  return useInfiniteQuery({
+    queryKey: ["tracking-activity", organizationId, projectId, from, to],
+    enabled: !!organizationId,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      if (!organizationId) return [];
+      const rpc = supabase.rpc.bind(supabase) as unknown as (
+        name: "get_tracking_activity_private",
+        args: Record<string, unknown>,
+      ) => PromiseLike<{ data: TrackingActivityRow[] | null; error: { message: string } | null }>;
+      const { data, error } = await rpc("get_tracking_activity_private", {
+        p_organization_id: organizationId,
+        p_project_id: projectId ?? undefined,
+        p_from: from,
+        p_to: to,
+        p_limit: pageSize,
+        p_offset: pageParam,
+      });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.length === pageSize ? pages.length * pageSize : undefined,
   });
 }
 

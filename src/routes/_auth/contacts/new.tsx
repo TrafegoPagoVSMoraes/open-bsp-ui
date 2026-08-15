@@ -78,7 +78,7 @@ function ContactNew() {
               type="email"
               className="text"
               placeholder="nome@exemplo.com"
-              {...register("extra.email")}
+              {...register("email")}
             />
           </label>
 

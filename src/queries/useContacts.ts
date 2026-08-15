@@ -46,17 +46,32 @@ export function useContactByAddress(
 export function useContacts() {
   const userId = useBoundStore((state) => state.ui.user?.id);
   const orgId = useBoundStore((state) => state.ui.activeOrgId);
+  const activeProjectId = useBoundStore((state) => state.ui.activeProjectId);
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: queryKeys.contacts.all(orgId),
+    queryKey: queryKeys.contacts.all(orgId, activeProjectId),
     queryFn: async () => {
       const PAGE_SIZE = 1000;
       let allData: ContactWithAddressesRow[] = [];
       let offset = 0;
+      let projectContactIds: string[] | null = null;
+      if (activeProjectId) {
+        const projectContacts = await (supabase as any)
+          .from("project_contacts")
+          .select("contact_id")
+          .eq("organization_id", orgId!)
+          .eq("project_id", activeProjectId);
+        if (!projectContacts.error) {
+          projectContactIds = Array.from(new Set(
+            (projectContacts.data ?? []).map((row: { contact_id: string }) => row.contact_id),
+          ));
+          if (projectContactIds.length === 0) return { data: [] };
+        }
+      }
 
       while (true) {
-        const { data: page } = await supabase
+        let contactsQuery = supabase
           .from("contacts")
           .select("*, addresses:contacts_addresses(*)")
           .eq("organization_id", orgId!)
@@ -65,8 +80,9 @@ export function useContacts() {
             referencedTable: "addresses",
             ascending: true,
           })
-          .range(offset, offset + PAGE_SIZE - 1)
-          .throwOnError();
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (projectContactIds) contactsQuery = contactsQuery.in("id", projectContactIds);
+        const { data: page } = await contactsQuery.throwOnError();
 
         allData = [...allData, ...(page as ContactWithAddressesRow[])];
         if (page.length < PAGE_SIZE) break;
@@ -118,6 +134,7 @@ export function useCreateContact() {
       const { addresses, ...contactData } = data;
       const normalizedContactData = {
         ...contactData,
+        email: (contactData.email ?? contactData.extra?.email)?.trim().toLocaleLowerCase() || null,
         name: normalizePersonName(contactData.name) || null,
         extra: contactData.extra
           ? {
@@ -168,7 +185,7 @@ export function useCreateContact() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.contacts.all(orgId),
+        queryKey: queryKeys.contacts.root(orgId),
       });
     },
   });
@@ -186,6 +203,7 @@ export function useUpdateContact() {
       const { addresses: rawNewAddresses, ...newContact } = data;
       const normalizedContact = {
         ...newContact,
+        email: (newContact.email ?? newContact.extra?.email)?.trim().toLocaleLowerCase() || null,
         name:
           newContact.name === undefined
             ? undefined
@@ -296,7 +314,7 @@ export function useUpdateContact() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.contacts.all(orgId),
+        queryKey: queryKeys.contacts.root(orgId),
       });
     },
   });
@@ -314,7 +332,7 @@ export function useDeleteContact() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.contacts.all(orgId),
+        queryKey: queryKeys.contacts.root(orgId),
       });
     },
   });

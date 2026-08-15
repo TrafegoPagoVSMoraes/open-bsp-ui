@@ -29,7 +29,7 @@ function ListContacts() {
   if (search) {
     const fuse = new Fuse(filtered, {
       threshold: 0.4,
-      keys: ["name", "addresses.address"],
+      keys: ["name", "email", "addresses.address"],
     });
     filtered = fuse.search(search).map((r) => r.item);
   }

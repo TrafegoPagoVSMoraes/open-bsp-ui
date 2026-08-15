@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import {
   useTagReport,
+  useTrackingActivity,
   useTrackingDashboard,
   useTrackingProjects,
 } from "@/queries/useTracking";
@@ -99,6 +100,8 @@ export default function StatsTracking() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [showPhoneNumbers, setShowPhoneNumbers] = useState(true);
   const dashboard = useTrackingDashboard(projectId, range.from, range.to);
+  const activity = useTrackingActivity(projectId, range.from, range.to);
+  const activityRows = activity.data?.pages.flat() ?? [];
 
   useEffect(() => {
     if (
@@ -112,7 +115,7 @@ export default function StatsTracking() {
   const summary = data?.summary;
   const canTogglePhoneNumbers = Boolean(
     data?.can_view_pii &&
-      data.recent_activity.some((activity) => activity.contact_address),
+      activityRows.some((item) => item.contact_address),
   );
 
   return (
@@ -410,7 +413,7 @@ export default function StatsTracking() {
               </tr>
             </thead>
             <tbody>
-              {data?.recent_activity.map((activity) => (
+              {activityRows.map((activity) => (
                 <tr
                   key={activity.event_id}
                   className="border-t border-border/70"
@@ -440,11 +443,20 @@ export default function StatsTracking() {
               ))}
             </tbody>
           </table>
-          {!data?.recent_activity.length ? (
+          {!activityRows.length ? (
             <div className="py-[36px] text-center text-[13px] text-muted-foreground">
-              {dashboard.isLoading
+              {activity.isLoading
                 ? t("Carregando…")
                 : t("Nenhuma atividade recente")}
+            </div>
+          ) : null}
+          {activity.hasNextPage ? (
+            <div className="border-t border-border p-[12px] text-center">
+              <button type="button" disabled={activity.isFetchingNextPage}
+                className="rounded-[10px] border border-border bg-background px-[14px] py-[8px] text-[12px] font-medium text-foreground disabled:opacity-50"
+                onClick={() => void activity.fetchNextPage()}>
+                {activity.isFetchingNextPage ? t("Carregando…") : t("Ver mais eventos")}
+              </button>
             </div>
           ) : null}
         </div>

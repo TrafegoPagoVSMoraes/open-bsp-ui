@@ -6,7 +6,7 @@ import { filters, Filters } from "@/stores/uiSlice";
 import Fuse from "fuse.js";
 import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/supabase/client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Spinner from "./Spinner";
 
 export type ConvMetadata = {
@@ -48,6 +48,7 @@ function pinnedAscending(a: ConversationRow, b: ConversationRow) {
 const ChatList = () => {
   const { translate: t } = useTranslation();
   const activeOrgId = useBoundStore((state) => state.ui.activeOrgId);
+  const activeProjectId = useBoundStore((state) => state.ui.activeProjectId);
   const conversations = useBoundStore((state) => state.chat.conversations);
   const messages = useBoundStore((state) => state.chat.messages);
   const conversationHistoryCursor = useBoundStore(
@@ -64,10 +65,33 @@ const ChatList = () => {
     (state) => state.chat.setConversationHistoryPagination,
   );
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [projectConversationIds, setProjectConversationIds] = useState<Set<string> | null>(null);
   const filterName = useBoundStore((state) => state.ui.filter);
   const setFilterName = useBoundStore((state) => state.ui.setFilter);
   const searchPattern = useBoundStore((state) => state.ui.searchPattern);
   const setSearchPattern = useBoundStore((state) => state.ui.setSearchPattern);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeProjectId) {
+      setProjectConversationIds(null);
+      return;
+    }
+    (async () => {
+      const result = await (supabase as any)
+        .from("project_conversations")
+        .select("conversation_id")
+        .eq("organization_id", activeOrgId)
+        .eq("project_id", activeProjectId);
+      // Missing additive project tables must not break the legacy/admin view.
+      if (!cancelled) {
+        setProjectConversationIds(result.error
+          ? null
+          : new Set((result.data ?? []).map((row: { conversation_id: string }) => row.conversation_id)));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeOrgId, activeProjectId]);
 
   function getMostRecentMsg(convId: string): MessageRow | undefined {
     return messages.get(convId)?.values().next().value;
@@ -86,6 +110,7 @@ const ChatList = () => {
     .filter(
       (a) =>
         a.conv.organization_id === activeOrgId &&
+        (projectConversationIds === null || projectConversationIds.has(a.conv.id)) &&
         filters[filterName](a.conv, a.mostRecentMsg) &&
         !!a.mostRecentMsg,
     );

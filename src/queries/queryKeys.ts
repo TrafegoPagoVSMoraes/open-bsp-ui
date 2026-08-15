@@ -1,6 +1,22 @@
 type NullableId = string | null | undefined;
 
 export const queryKeys = {
+  projects: {
+    root: (orgId: NullableId) => [orgId, "projects"] as const,
+    all: (orgId: NullableId) => [orgId, "projects", "all"] as const,
+    tags: (orgId: NullableId, projectId: NullableId) =>
+      [orgId, "projects", projectId, "tags"] as const,
+    aliases: (orgId: NullableId, projectId: NullableId) =>
+      [orgId, "projects", projectId, "aliases"] as const,
+    memberships: (orgId: NullableId) =>
+      [orgId, "projects", "memberships"] as const,
+    performance: (
+      orgId: NullableId,
+      projectId: NullableId,
+      from: NullableId,
+      to: NullableId,
+    ) => [orgId, "projects", projectId, "performance", from, to] as const,
+  },
   agents: {
     all: (orgId: NullableId) => [orgId, "agents"] as const,
     detail: (orgId: NullableId, id: NullableId) =>
@@ -14,7 +30,9 @@ export const queryKeys = {
       [orgId, "api_keys", id] as const,
   },
   contacts: {
-    all: (orgId: NullableId) => [orgId, "contacts"] as const,
+    root: (orgId: NullableId) => [orgId, "contacts"] as const,
+    all: (orgId: NullableId, projectId?: NullableId) =>
+      [orgId, "contacts", projectId ?? null] as const,
     detail: (orgId: NullableId, id: NullableId) =>
       [orgId, "contacts", id] as const,
     // contacts_addresses PK is (organization_id, service, address): the same

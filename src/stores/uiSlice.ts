@@ -64,6 +64,7 @@ export type UIState = {
   templatePicker: boolean;
   templateDrafts: Map<string, TemplateDraft>;
   activeOrgId: string | null;
+  activeProjectId: string | null;
   activeConvId: string | null;
   user: User | null;
   sendAsContact: boolean;
@@ -76,6 +77,7 @@ export type UIState = {
 export type UIActions = {
   toggle: (component: keyof UIState, value?: boolean) => void;
   setActiveOrg: (id: string | null) => void;
+  setActiveProject: (id: string | null) => void;
   setActiveConv: (id: string | null) => void;
   setUser: (user: User | null) => void;
   setSendAsContact: (sendAsContact: boolean) => void;
@@ -100,6 +102,7 @@ export const createUISlice: StateCreator<Partial<AppState>> = (
   templatePicker: false,
   templateDrafts: new Map(),
   activeOrgId: null,
+  activeProjectId: null,
   activeConvId: null,
   user: null,
   sendAsContact: false,
@@ -119,6 +122,14 @@ export const createUISlice: StateCreator<Partial<AppState>> = (
       ui: {
         ...state.ui,
         activeOrgId,
+        activeProjectId: null,
+      },
+    })),
+  setActiveProject: (activeProjectId: string | null) =>
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        activeProjectId,
       },
     })),
   setActiveConv: (activeConvId: string | null) =>

@@ -13,6 +13,7 @@ import {
   Plus,
   NotebookTabs,
   Megaphone,
+  FolderKanban,
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { LinkButton } from "./LinkButton";
@@ -20,6 +21,7 @@ import { resetAuthorizedCache } from "@/utils/IdbUtils";
 import { useCurrentAgent } from "@/queries/useAgents";
 import { Dropdown } from "antd";
 import { useOrganizations } from "@/queries/useOrganizations";
+import { useProjects } from "@/queries/useProjects";
 
 export default function Menu() {
   const user = useBoundStore((state) => state.ui.user);
@@ -28,8 +30,11 @@ export default function Menu() {
 
   const setActiveOrg = useBoundStore((state) => state.ui.setActiveOrg);
   const activeOrgId = useBoundStore((state) => state.ui.activeOrgId);
+  const activeProjectId = useBoundStore((state) => state.ui.activeProjectId);
+  const setActiveProject = useBoundStore((state) => state.ui.setActiveProject);
 
   const { data: organizations } = useOrganizations();
+  const { data: projects = [] } = useProjects();
 
   const {
     translate: t,
@@ -78,6 +83,15 @@ export default function Menu() {
           className="mt-[10px]"
         >
           <NotebookTabs className="w-[24px] h-[24px] stroke-[2]" />
+        </LinkButton>
+
+        <LinkButton
+          to="/projects"
+          title="Projetos"
+          isActive={pathname.startsWith("/projects")}
+          className="mt-[10px]"
+        >
+          <FolderKanban className="w-[24px] h-[24px] stroke-[2]" />
         </LinkButton>
 
         <LinkButton
@@ -130,6 +144,26 @@ export default function Menu() {
                 type: "group", // using group name as title style
                 label: user?.email || "",
               },
+              ...(projects.length ? [
+                { type: "divider" as const },
+                {
+                  key: "projects",
+                  type: "group" as const,
+                  label: "Projeto ativo",
+                  children: [
+                    {
+                      key: "project:all",
+                      label: "Todos os projetos",
+                      onClick: () => setActiveProject(null),
+                    },
+                    ...projects.map((project) => ({
+                      key: `project:${project.id}`,
+                      label: project.name,
+                      onClick: () => setActiveProject(project.id),
+                    })),
+                  ],
+                },
+              ] : []),
               { type: "divider" },
               {
                 key: "orgs",
@@ -191,7 +225,10 @@ export default function Menu() {
               },
             ],
             selectable: true,
-            selectedKeys: [...(activeOrgId ? [activeOrgId] : [])],
+            selectedKeys: [
+              ...(activeOrgId ? [activeOrgId] : []),
+              ...(activeProjectId ? [`project:${activeProjectId}`] : []),
+            ],
           }}
           trigger={["click"]}
         >

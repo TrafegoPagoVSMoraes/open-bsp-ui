@@ -51,7 +51,7 @@ function ContactDetail() {
   } = useForm<ContactFormValues>({
     mode: "onTouched",
     values: contact
-      ? { ...contact, tag_ids: contactTags.map((tag) => tag.id) }
+      ? { ...contact, email: contact.email ?? contact.extra?.email ?? "", tag_ids: contactTags.map((tag) => tag.id) }
       : undefined,
   });
 
@@ -101,7 +101,7 @@ function ContactDetail() {
                 type="email"
                 className="text"
                 placeholder="nome@exemplo.com"
-                {...register("extra.email")}
+                {...register("email")}
               />
             </label>
 

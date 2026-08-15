@@ -1,6 +1,4 @@
 import { type OutgoingStatus } from "@/supabase/client";
-// @ts-expect-error no type declarations for the core-js-pure submodule
-import toReversed from "core-js-pure/actual/array/to-reversed";
 
 const outgoingStatusHierarchy = [
   "pending",
@@ -25,7 +23,20 @@ export function getHighestStatus(
     return "pending";
   }
 
-  for (const level of toReversed(outgoingStatusHierarchy)) {
+  // A retry can preserve an earlier `failed` timestamp while a later request
+  // is accepted by WhatsApp. A confirmed success must win in that case; an
+  // error is only final when no success status exists.
+  for (const level of ["read", "delivered", "sent", "accepted"] as const) {
+    if (level in status) {
+      return level;
+    }
+  }
+
+  if ("failed" in status) {
+    return "failed";
+  }
+
+  for (const level of ["held_for_quality_assessment", "pending"] as const) {
     if (level in status) {
       return level;
     }
@@ -48,11 +59,11 @@ export function getStatusIcon(
   switch (status) {
     case "pending":
     case "held_for_quality_assessment":
+    case "accepted":
       return {
         icon: "clock",
         color: "",
       };
-    case "accepted":
     case "sent":
       return {
         icon: "check",

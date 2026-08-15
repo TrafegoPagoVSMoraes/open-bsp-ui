@@ -69,7 +69,54 @@ export async function pushMessageToDb(
   record: MessageInsert,
   ignoreDuplicates = true,
 ) {
-  const insertQuery = await supabase.from("messages").upsert(record, {
+  let resolvedRecord = record;
+  const activeProjectId = useBoundStore.getState().ui.activeProjectId;
+  const { data: projectLinks, error: projectLinksError } = await (
+    supabase as any
+  )
+    .from("project_conversations")
+    .select("project_id")
+    .eq("organization_id", record.organization_id)
+    .eq("conversation_id", record.conversation_id);
+
+  // Preserve the legacy flow when the additive project migration is not yet
+  // deployed. Otherwise, attach only an unambiguous conversation project (or
+  // an explicitly selected project that actually belongs to the conversation).
+  if (!projectLinksError) {
+    const projectIds = Array.from(
+      new Set(
+        (projectLinks as Array<{ project_id: string }> | null ?? [])
+          .map((link) => link.project_id),
+      ),
+    );
+    let activeProjectCanSend = false;
+    if (
+      activeProjectId && projectIds.length === 0 && record.organization_id &&
+      record.conversation_id
+    ) {
+      const { data: canSend } = await supabase.rpc(
+        "can_send_project_message",
+        {
+          p_organization_id: record.organization_id,
+          p_project_id: activeProjectId,
+          p_conversation_id: record.conversation_id,
+        },
+      );
+      activeProjectCanSend = canSend === true;
+    }
+    const projectId = activeProjectId &&
+        (projectIds.includes(activeProjectId) || activeProjectCanSend)
+      ? activeProjectId
+      : projectIds.length === 1
+      ? projectIds[0]
+      : null;
+    resolvedRecord = {
+      ...(record as unknown as Record<string, unknown>),
+      project_id: projectId,
+    } as unknown as MessageInsert;
+  }
+
+  const insertQuery = await supabase.from("messages").upsert(resolvedRecord, {
     ignoreDuplicates,
   });
 

@@ -6,6 +6,7 @@ import type { CampaignImportRecord } from "@/utils/CampaignImportUtils";
 
 export type CampaignStatus =
   | "draft"
+  | "scheduled"
   | "queued"
   | "running"
   | "cancel_requested"
@@ -45,16 +46,24 @@ async function invokeCampaign<T>(body: InvokeBody): Promise<T> {
     method: "POST",
     body,
   });
-  if (error) throw error;
+  if (error) {
+    const response = (error as { context?: Response }).context;
+    const payload = response ? await response.clone().json().catch(() => null) : null;
+    const reason = payload && typeof payload === "object" && "error" in payload
+      ? String(payload.error)
+      : error.message;
+    throw new Error(reason);
+  }
   if (data?.error) throw new Error(data.error.message || data.error);
   return (data?.data ?? data) as T;
 }
 
 export function useCampaigns() {
   const organizationId = useBoundStore((state) => state.ui.activeOrgId);
+  const projectId = useBoundStore((state) => state.ui.activeProjectId);
   return useQuery({
-    queryKey: ["campaigns", organizationId],
-    queryFn: () => invokeCampaign<CampaignSummary[]>({ action: "list_campaigns", organization_id: organizationId }),
+    queryKey: ["campaigns", organizationId, projectId],
+    queryFn: () => invokeCampaign<CampaignSummary[]>({ action: "list_campaigns", organization_id: organizationId, project_id: projectId }),
     enabled: !!organizationId,
     refetchInterval: (query) =>
       query.state.data?.some((campaign) => ["queued", "running", "cancel_requested"].includes(campaign.status))
@@ -63,15 +72,28 @@ export function useCampaigns() {
   });
 }
 
-export function useCampaignAudience(tagIds: string[], organizationAddress: string) {
+export function useCampaignAudience(
+  tagIds: string[],
+  excludedTagIds: string[],
+  organizationAddress: string,
+) {
   const organizationId = useBoundStore((state) => state.ui.activeOrgId);
+  const projectId = useBoundStore((state) => state.ui.activeProjectId);
   return useQuery({
-    queryKey: ["campaign-audience", organizationId, organizationAddress, [...tagIds].sort()],
+    queryKey: [
+      "campaign-audience",
+      organizationId,
+      organizationAddress,
+      [...tagIds].sort(),
+      [...excludedTagIds].sort(),
+    ],
     queryFn: () => invokeCampaign<CampaignAudience>({
       action: "audience_preview",
       organization_id: organizationId,
+      project_id: projectId,
       organization_address: organizationAddress,
       tag_ids: tagIds,
+      exclude_tag_ids: excludedTagIds,
       include_available_tags: true,
     }),
     enabled: !!organizationId,
@@ -80,6 +102,7 @@ export function useCampaignAudience(tagIds: string[], organizationAddress: strin
 
 export function useCampaignActions() {
   const organizationId = useBoundStore((state) => state.ui.activeOrgId);
+  const projectId = useBoundStore((state) => state.ui.activeProjectId);
   const queryClient = useQueryClient();
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["campaigns", organizationId] });
 
@@ -87,6 +110,7 @@ export function useCampaignActions() {
     mutationFn: ({ records, organizationAddress }: { records: CampaignImportRecord[]; organizationAddress: string }) => invokeCampaign<CampaignAudience>({
       action: "preview_import",
       organization_id: organizationId,
+      project_id: projectId,
       organization_address: organizationAddress,
       records,
     }),
@@ -95,6 +119,7 @@ export function useCampaignActions() {
     mutationFn: (payload: InvokeBody) => invokeCampaign<{ id?: string; external_id?: string; status: string }>({
       action: "create_test",
       organization_id: organizationId,
+      project_id: projectId,
       ...payload,
     }),
   });
@@ -102,20 +127,32 @@ export function useCampaignActions() {
     mutationFn: (payload: InvokeBody) => invokeCampaign<{ id: string }>({
       action: "create_campaign",
       organization_id: organizationId,
+      project_id: projectId,
       ...payload,
     }),
     onSuccess: invalidate,
   });
   const startCampaign = useMutation({
-    mutationFn: (campaignId: string) => invokeCampaign({ action: "start_campaign", organization_id: organizationId, campaign_id: campaignId }),
+    mutationFn: (campaignId: string) => invokeCampaign({ action: "start_campaign", organization_id: organizationId, project_id: projectId, campaign_id: campaignId }),
+    onSuccess: invalidate,
+  });
+  const scheduleCampaign = useMutation({
+    mutationFn: ({ campaignId, scheduledAt }: { campaignId: string; scheduledAt: string }) =>
+      invokeCampaign({
+        action: "schedule_campaign",
+        organization_id: organizationId,
+        project_id: projectId,
+        campaign_id: campaignId,
+        scheduled_at: scheduledAt,
+      }),
     onSuccess: invalidate,
   });
   const cancelCampaign = useMutation({
-    mutationFn: (campaignId: string) => invokeCampaign({ action: "cancel_campaign", organization_id: organizationId, campaign_id: campaignId }),
+    mutationFn: (campaignId: string) => invokeCampaign({ action: "cancel_campaign", organization_id: organizationId, project_id: projectId, campaign_id: campaignId }),
     onSuccess: invalidate,
   });
 
-  return { previewImport, createTest, createCampaign, startCampaign, cancelCampaign };
+  return { previewImport, createTest, createCampaign, startCampaign, scheduleCampaign, cancelCampaign };
 }
 
 export function useCampaignRealtime() {

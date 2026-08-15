@@ -149,9 +149,9 @@ export type Database = MergeDeep<
               };
         };
         contacts: {
-          Row: { extra: ContactExtra | null };
-          Insert: { extra?: ContactExtra | null };
-          Update: { extra?: ContactExtra | null };
+          Row: { email: string | null; extra: ContactExtra | null };
+          Insert: { email?: string | null; extra?: ContactExtra | null };
+          Update: { email?: string | null; extra?: ContactExtra | null };
         };
         contacts_addresses: {
           Row: { extra: ContactAddressExtra | null };

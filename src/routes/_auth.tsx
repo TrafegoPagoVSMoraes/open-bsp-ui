@@ -42,6 +42,7 @@ function AppLayout() {
   const pathname = location.pathname;
   const isStatsRoute = pathname.startsWith("/stats");
   const isCampaignRoute = pathname.startsWith("/campaigns");
+  const isProjectRoute = pathname.startsWith("/projects");
 
   const [isHoveringFiles, setIsHoveringFiles] = useState(false);
 
@@ -67,7 +68,7 @@ function AppLayout() {
 
   const showCenterPanel = activeConvId || isStatsRoute;
 
-  if (isCampaignRoute) {
+  if (isCampaignRoute || isProjectRoute) {
     return (
       <div
         className="grid h-full"

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/supabase/client";
 import { useTranslation } from "@/hooks/useTranslation";
 import { GoogleOutlined, GithubOutlined } from "@ant-design/icons";
@@ -18,7 +18,11 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const { redirect, email: showEmail } = Route.useSearch();
+  const { redirect, email: initialEmail } = Route.useSearch();
+
+  useEffect(() => {
+    if (initialEmail) setEmail(initialEmail);
+  }, [initialEmail]);
 
   const { translate: t } = useTranslation();
 
@@ -70,13 +74,11 @@ function Login() {
           <GithubOutlined /> {t("Continuar con GitHub")}
         </button>
 
-        <div
-          className={`border-b border-border w-full ${showEmail ? "" : "hidden"}`}
-        />
+        <div className="border-b border-border w-full" />
 
         <form
           onSubmit={handleLogInWithEmail}
-          className={`login-form ${showEmail ? "" : "hidden"}`}
+          className="login-form"
         >
           <label>
             <div className="label">{t("Correo electrónico")}</div>

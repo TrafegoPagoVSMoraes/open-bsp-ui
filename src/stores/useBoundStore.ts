@@ -52,6 +52,7 @@ const useBoundStore = create<AppState>()(
           searchPattern: state.ui.searchPattern,
           filter: state.ui.filter,
           activeOrgId: state.ui.activeOrgId,
+          activeProjectId: state.ui.activeProjectId,
           language: state.ui.language,
         },
       }),
@@ -68,6 +69,7 @@ export function reset() {
       ui: {
         ...state.ui,
         activeOrgId: null,
+        activeProjectId: null,
         activeConvId: null,
         initialized: false,
       },

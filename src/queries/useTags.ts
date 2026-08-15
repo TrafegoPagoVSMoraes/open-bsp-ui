@@ -22,6 +22,8 @@ export function useTags() {
         .order("name")
         .throwOnError(),
     enabled: !!userId && !!orgId,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     select: (result) => result.data,
   });
 }

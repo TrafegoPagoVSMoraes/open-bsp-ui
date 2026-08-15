@@ -15,7 +15,14 @@ export type CampaignImportPreview = {
 };
 
 const NAME_KEYS = ["nome", "name", "nome_completo", "full_name"];
-const PHONE_KEYS = ["whatsapp", "telefone", "phone", "celular", "numero"];
+const PHONE_KEYS = [
+  "whatsapp",
+  "telefone",
+  "phone",
+  "phone_number",
+  "celular",
+  "numero",
+];
 const EMAIL_KEYS = ["email", "e-mail"];
 const LOWERCASE_PARTICLES = new Set(["da", "das", "de", "do", "dos", "e"]);
 
@@ -109,15 +116,24 @@ function pick(record: Record<string, string>, keys: string[]) {
 }
 
 function spreadsheetRowsToRecords(rows: unknown[][]) {
+  const stringifyCell = (cell: unknown) => {
+    if (cell == null) return "";
+    if (cell instanceof Date) return cell.toISOString();
+    if (typeof cell === "string") return cell.trim();
+    if (typeof cell === "number" || typeof cell === "boolean") {
+      return String(cell).trim();
+    }
+    return "";
+  };
   const [headerRow = [], ...dataRows] = rows;
-  const headers = headerRow.map((cell) => normalizeKey(cell == null ? "" : String(cell)));
+  const headers = headerRow.map((cell) => normalizeKey(stringifyCell(cell)));
 
   return dataRows
-    .filter((row) => row.some((cell) => cell != null && String(cell).trim()))
+    .filter((row) => row.some((cell) => stringifyCell(cell)))
     .map((row) =>
       Object.fromEntries(
         headers
-          .map((header, index) => [header, row[index] == null ? "" : String(row[index]).trim()] as const)
+          .map((header, index) => [header, stringifyCell(row[index])] as const)
           .filter(([header]) => header),
       ),
     );

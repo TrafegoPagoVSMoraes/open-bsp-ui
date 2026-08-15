@@ -24,7 +24,11 @@ const slugify = (value: string) =>
     .replace(/^-|-$/g, "");
 
 function TagsSettings() {
-  const { data: tags = [] } = useTags();
+  const {
+    data: tags = [],
+    error: tagsError,
+    isLoading: tagsLoading,
+  } = useTags();
   const createTag = useCreateTag();
   const deleteTag = useDeleteTag();
   const updateTag = useUpdateTag();
@@ -65,6 +69,19 @@ function TagsSettings() {
         </div>
 
         <div className="flex flex-col gap-2">
+          {tagsLoading && (
+            <p className="text-sm text-muted-foreground">Carregando tags...</p>
+          )}
+          {tagsError && (
+            <p className="text-sm text-destructive">
+              Não foi possível carregar as tags. Atualize a página ou tente novamente.
+            </p>
+          )}
+          {!tagsLoading && !tagsError && tags.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma tag cadastrada nesta organização.
+            </p>
+          )}
           {tags.map((tag) => (
             <div key={tag.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
               {editingId === tag.id ? (
