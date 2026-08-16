@@ -18,7 +18,7 @@ import {
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { LinkButton } from "./LinkButton";
 import { resetAuthorizedCache } from "@/utils/IdbUtils";
-import { useCurrentAgent } from "@/queries/useAgents";
+import { useCurrentAgent, useCurrentAgents } from "@/queries/useAgents";
 import { Dropdown } from "antd";
 import { useOrganizations } from "@/queries/useOrganizations";
 import { useProjects } from "@/queries/useProjects";
@@ -31,10 +31,19 @@ export default function Menu() {
   const setActiveOrg = useBoundStore((state) => state.ui.setActiveOrg);
   const activeOrgId = useBoundStore((state) => state.ui.activeOrgId);
   const activeProjectId = useBoundStore((state) => state.ui.activeProjectId);
+  const activeExpertId = useBoundStore((state) => state.ui.activeExpertId);
   const setActiveProject = useBoundStore((state) => state.ui.setActiveProject);
+  const setActiveExpert = useBoundStore((state) => state.ui.setActiveExpert);
 
   const { data: organizations } = useOrganizations();
   const { data: projects = [] } = useProjects();
+  const { data: agents = [] } = useCurrentAgents();
+  const isAdmin = ["admin", "owner"].includes(agent?.extra?.role ?? "");
+  const isExpert =
+    (agent?.extra as { account_type?: string } | null)?.account_type === "expert";
+  const experts = agents.filter(
+    (item) => !item.ai && (item.extra as { account_type?: string } | null)?.account_type === "expert",
+  );
 
   const {
     translate: t,
@@ -66,14 +75,14 @@ export default function Menu() {
         </LinkButton>
 
         {/* Agents button */}
-        <LinkButton
+        {!isExpert && <LinkButton
           to="/agents"
           title={t("Agentes")}
           isActive={pathname.startsWith("/agents")}
           className="mt-[10px]"
         >
           <Bot className="w-[24px] h-[24px] stroke-[2]" />
-        </LinkButton>
+        </LinkButton>}
 
         {/* Contacts button */}
         <LinkButton
@@ -94,47 +103,47 @@ export default function Menu() {
           <FolderKanban className="w-[24px] h-[24px] stroke-[2]" />
         </LinkButton>
 
-        <LinkButton
-          to="/campaigns"
-          title="Campanhas"
-          isActive={pathname.startsWith("/campaigns")}
-          className="mt-[10px]"
-        >
-          <Megaphone className="w-[24px] h-[24px] stroke-[2]" />
-        </LinkButton>
+        {!isExpert && <LinkButton
+            to="/campaigns"
+            title="Campanhas"
+            isActive={pathname.startsWith("/campaigns")}
+            className="mt-[10px]"
+          >
+            <Megaphone className="w-[24px] h-[24px] stroke-[2]" />
+          </LinkButton>}
 
         {/* Integrations button */}
-        <LinkButton
+        {!isExpert && <LinkButton
           to="/integrations"
           title={t("Integraciones")}
           isActive={pathname.startsWith("/integrations")}
           className="mt-[10px]"
         >
           <Unplug className="w-[24px] h-[24px] stroke-[2]" />
-        </LinkButton>
+        </LinkButton>}
 
         {/* Stats button */}
-        <LinkButton
+        {!isExpert && <LinkButton
           to="/stats"
           title={t("Estadísticas")}
           isActive={pathname.startsWith("/stats")}
           className="mt-[10px]"
         >
           <BarChart3 className="w-[24px] h-[24px] stroke-[2]" />
-        </LinkButton>
+        </LinkButton>}
       </div>
 
       {/* Lower section */}
       <div className="flex flex-col items-center">
         {/* Settings button */}
-        <LinkButton
+        {!isExpert && <LinkButton
           to="/settings"
           title={t("Preferencias")}
           isActive={pathname.startsWith("/settings")}
           className="mt-[10px]"
         >
           <Settings className="w-[20px] h-[20px] stroke-[2]" />
-        </LinkButton>
+        </LinkButton>}
 
         <Dropdown
           menu={{
@@ -144,21 +153,26 @@ export default function Menu() {
                 type: "group", // using group name as title style
                 label: user?.email || "",
               },
-              ...(projects.length ? [
+              ...(projects.length || (isAdmin && experts.length) ? [
                 { type: "divider" as const },
                 {
-                  key: "projects",
+                  key: "scope",
                   type: "group" as const,
-                  label: "Projeto ativo",
+                  label: "Visualizar dados por",
                   children: [
                     {
-                      key: "project:all",
-                      label: "Todos os projetos",
+                      key: "scope:all",
+                      label: "Todos",
                       onClick: () => setActiveProject(null),
                     },
+                    ...(isAdmin ? experts.map((expert) => ({
+                      key: `expert:${expert.id}`,
+                      label: `Expert: ${expert.name || "Sem nome"}`,
+                      onClick: () => setActiveExpert(expert.id),
+                    })) : []),
                     ...projects.map((project) => ({
                       key: `project:${project.id}`,
-                      label: project.name,
+                      label: `Projeto: ${project.name}`,
                       onClick: () => setActiveProject(project.id),
                     })),
                   ],
@@ -178,7 +192,7 @@ export default function Menu() {
                       navigate({ to: "/conversations" });
                     },
                   })) || []),
-                  {
+                  ...(!isExpert ? [{
                     key: "new_org",
                     label: t("Nueva organización"),
                     icon: <Plus className="w-[16px] h-[16px]" />,
@@ -187,7 +201,7 @@ export default function Menu() {
                         to: "/settings/organization/new",
                         hash: (prevHash) => prevHash!,
                       }),
-                  },
+                  }] : []),
                 ],
               },
               { type: "divider" },
@@ -228,6 +242,8 @@ export default function Menu() {
             selectedKeys: [
               ...(activeOrgId ? [activeOrgId] : []),
               ...(activeProjectId ? [`project:${activeProjectId}`] : []),
+              ...(activeExpertId ? [`expert:${activeExpertId}`] : []),
+              ...(!activeProjectId && !activeExpertId ? ["scope:all"] : []),
             ],
           }}
           trigger={["click"]}

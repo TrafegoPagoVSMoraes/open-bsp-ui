@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/supabase/client";
 import useBoundStore from "@/stores/useBoundStore";
 import { queryKeys } from "./queryKeys";
+import { useCurrentAgent } from "./useAgents";
 
 const db = supabase as any;
 
@@ -116,6 +117,62 @@ export function useProjectMemberships() {
   });
 }
 
+/**
+ * Resolves the visual project scope. Database RLS remains the authorization
+ * boundary; this hook only narrows data already visible to the current user.
+ * `projectIds === null` means the administrator selected the whole account.
+ */
+export function useProjectScope() {
+  const storedProjectId = useBoundStore((state) => state.ui.activeProjectId);
+  const storedExpertId = useBoundStore((state) => state.ui.activeExpertId);
+  const projectsQuery = useProjects();
+  const membershipsQuery = useProjectMemberships();
+  const currentAgentQuery = useCurrentAgent();
+  const projects = projectsQuery.data ?? [];
+  const memberships = membershipsQuery.data ?? [];
+  const isAdmin = ["admin", "owner"].includes(
+    currentAgentQuery.data?.extra?.role ?? "",
+  );
+  const isExpert =
+    (currentAgentQuery.data?.extra as { account_type?: string } | null)
+      ?.account_type === "expert";
+  const activeProjectId = projects.some((project) => project.id === storedProjectId)
+    ? storedProjectId
+    : null;
+  const activeExpertId = isAdmin ? storedExpertId : null;
+
+  const projectIds = activeProjectId
+    ? [activeProjectId]
+    : activeExpertId
+      ? memberships
+          .filter((membership) => membership.agent_id === activeExpertId)
+          .map((membership) => membership.project_id)
+      : isExpert
+        ? projects.map((project) => project.id)
+        : null;
+  const allowed = projectIds === null ? null : new Set(projectIds);
+  const visibleProjects = allowed === null
+    ? projects
+    : projects.filter((project) => allowed.has(project.id));
+  const normalizedIds = projectIds === null
+    ? null
+    : [...new Set(projectIds)].sort();
+
+  return {
+    activeProjectId,
+    activeExpertId,
+    isAdmin,
+    isExpert,
+    projectIds: normalizedIds,
+    scopeKey: normalizedIds === null ? "all" : `projects:${normalizedIds.join(",")}`,
+    visibleProjects,
+    isLoading:
+      projectsQuery.isLoading ||
+      currentAgentQuery.isLoading ||
+      (!!activeExpertId && membershipsQuery.isLoading),
+  };
+}
+
 export function useSetExpertProjects() {
   const orgId = useBoundStore((state) => state.ui.activeOrgId);
   const queryClient = useQueryClient();
@@ -140,6 +197,36 @@ export function useSetExpertProjects() {
         const { error } = await db.from("project_memberships").delete()
           .eq("organization_id", orgId).eq("agent_id", agentId)
           .in("project_id", removals);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.memberships(orgId) }),
+  });
+}
+
+export function useSetProjectExperts() {
+  const orgId = useBoundStore((state) => state.ui.activeOrgId);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ projectId, expertIds }: { projectId: string; expertIds: string[] }) => {
+      if (!orgId) throw new Error("Nenhuma organização ativa.");
+      const { data: currentRows, error: readError } = await db
+        .from("project_memberships").select("agent_id")
+        .eq("organization_id", orgId).eq("project_id", projectId).eq("role", "expert");
+      if (readError) throw readError;
+      const current = new Set<string>((currentRows ?? []).map((row: { agent_id: string }) => row.agent_id));
+      const requested = new Set(expertIds);
+      const additions = expertIds.filter((agentId) => !current.has(agentId));
+      const removals = [...current].filter((agentId) => !requested.has(agentId));
+      if (additions.length) {
+        const { error } = await db.from("project_memberships").insert(additions.map((agentId) => ({
+          organization_id: orgId, project_id: projectId, agent_id: agentId, role: "expert",
+        })));
+        if (error) throw error;
+      }
+      if (removals.length) {
+        const { error } = await db.from("project_memberships").delete()
+          .eq("organization_id", orgId).eq("project_id", projectId).eq("role", "expert").in("agent_id", removals);
         if (error) throw error;
       }
     },

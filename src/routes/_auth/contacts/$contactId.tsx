@@ -4,6 +4,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 import {
   useContact,
   useDeleteContact,
+  useContactProjects,
+  useSetContactProjects,
   useUpdateContact,
 } from "@/queries/useContacts";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
@@ -20,8 +22,9 @@ import { formatPhoneNumber, isValidPhoneNumber } from "@/utils/FormatUtils";
 import FieldError from "@/components/FieldError";
 import TagSelector from "@/components/TagSelector";
 import { useContactTags, useSetContactTags } from "@/queries/useTags";
+import ProjectSelector from "@/components/ProjectSelector";
 
-type ContactFormValues = ContactWithAddressesUpdate & { tag_ids: string[] };
+type ContactFormValues = ContactWithAddressesUpdate & { tag_ids: string[]; project_ids: string[] };
 
 export const Route = createFileRoute("/_auth/contacts/$contactId")({
   component: ContactDetail,
@@ -36,10 +39,12 @@ function ContactDetail() {
   const updateContact = useUpdateContact();
   const setContactTags = useSetContactTags();
   const { data: contactTags } = useContactTags(contactId);
+  const { data: contactProjects = [] } = useContactProjects(contactId);
+  const setContactProjects = useSetContactProjects();
 
   // Track original addresses (these will be readonly)
   const originalAddresses = useMemo(
-    () => new Set(contact?.addresses.map((a) => a.address) ?? []),
+    () => new Map(contact?.addresses.map((address) => [`${address.service}:${address.address}`, address]) ?? []),
     [contact],
   );
 
@@ -51,7 +56,7 @@ function ContactDetail() {
   } = useForm<ContactFormValues>({
     mode: "onTouched",
     values: contact
-      ? { ...contact, email: contact.email ?? contact.extra?.email ?? "", tag_ids: contactTags.map((tag) => tag.id) }
+      ? { ...contact, email: contact.email ?? contact.extra?.email ?? "", tag_ids: contactTags.map((tag) => tag.id), project_ids: contactProjects }
       : undefined,
   });
 
@@ -77,12 +82,12 @@ function ContactDetail() {
         <SectionBody>
           <form
             id="contact-form"
-            onSubmit={handleSubmit(async ({ tag_ids, ...data }) => {
+            onSubmit={handleSubmit(async ({ tag_ids, project_ids, ...data }) => {
               await updateContact.mutateAsync(data);
-              await setContactTags.mutateAsync({
-                contactId,
-                tagIds: tag_ids,
-              });
+              await Promise.all([
+                setContactTags.mutateAsync({ contactId, tagIds: tag_ids }),
+                setContactProjects.mutateAsync({ contactId, projectIds: project_ids }),
+              ]);
             })}
           >
             <label>
@@ -116,19 +121,27 @@ function ContactDetail() {
               )}
             />
 
+            <Controller
+              name="project_ids"
+              control={control}
+              render={({ field }) => (
+                <ProjectSelector value={field.value ?? []} onChange={field.onChange} />
+              )}
+            />
+
             {fields.map((field, idx) => {
-              const isExisting = originalAddresses.has(field.address ?? "");
+              const originalAddress = originalAddresses.get(`${field.service ?? "whatsapp"}:${field.address ?? ""}`);
+              const isSynced =
+                (originalAddress?.extra as WhatsAppContactAddressExtra | null)?.synced
+                  ?.action === "add";
               return (
                 <label key={field.id}>
                   <div className="label">
                     {t("Teléfono")} {idx + 1}{" "}
-                    {(field.extra as WhatsAppContactAddressExtra | null)?.synced
-                      ?.action === "add"
-                      ? "(" + t("Sincronizado") + ")"
-                      : ""}
+                    {isSynced ? "(" + t("Sincronizado") + " — protegido)" : ""}
                   </div>
                   <div className="flex items-center gap-2">
-                    {isExisting ? (
+                    {isSynced ? (
                       <input
                         type="tel"
                         className="text"
@@ -156,9 +169,10 @@ function ContactDetail() {
                       type="button"
                       className="p-[8px] rounded-full hover:bg-muted transition-colors"
                       onClick={() => remove(idx)}
+                      disabled={isSynced}
                       title={t("Eliminar")}
                     >
-                      <X className="w-5 h-5" />
+                      <X className={`w-5 h-5 ${isSynced ? "opacity-40" : ""}`} />
                     </button>
                   </div>
                   <FieldError error={errors.addresses?.[idx]?.address} />
@@ -183,7 +197,7 @@ function ContactDetail() {
             form="contact-form"
             type="submit"
             invalid={!isValid || !isDirty}
-            loading={updateContact.isPending || setContactTags.isPending}
+            loading={updateContact.isPending || setContactTags.isPending || setContactProjects.isPending}
             className="primary"
           >
             {t("Actualizar")}

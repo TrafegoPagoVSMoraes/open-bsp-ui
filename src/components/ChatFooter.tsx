@@ -107,6 +107,8 @@ export default function ChatFooter() {
 
   const { data: agent } = useCurrentAgent();
   const agentId = agent?.id;
+  const isExpert =
+    (agent?.extra as { account_type?: string } | null)?.account_type === "expert";
 
   const [timer, setTimer] = useState<ReturnType<typeof setTimeout>>();
 
@@ -145,10 +147,16 @@ export default function ChatFooter() {
     .to(dayjs(mostRecentIncoming?.timestamp || 0).add(1, "day"), true);
 
   // Template mode: derive from per-conv store
-  const templateDraft = templateDraftEntry?.template;
+  const templateDraft = isExpert ? undefined : templateDraftEntry?.template;
   const bodyVarValues = templateDraftEntry?.bodyVarValues || [];
   const headVarValues = templateDraftEntry?.headVarValues || [];
   const buttonVarValues = templateDraftEntry?.buttonVarValues || [];
+
+  useEffect(() => {
+    if (!isExpert || !activeConvId) return;
+    setTemplateDraft(activeConvId, null);
+    toggle("templatePicker", false);
+  }, [activeConvId, isExpert, setTemplateDraft, toggle]);
 
   const templateBody = templateDraft?.components.find((c) => c.type === "BODY");
   const templateHead = templateDraft?.components.find(
@@ -524,7 +532,7 @@ export default function ChatFooter() {
     activeConvId &&
     conv && (
       <div className="relative mx-[12px] mb-[12px] mt-[4px] lg:mt-[0px] z-10">
-        {templatePicker && <TemplatePicker />}
+        {!isExpert && templatePicker && <TemplatePicker />}
         <div
           className={
             "flex items-end text-foreground p-[5px] rounded-[24px] shadow-[0_0_4px_0px_rgba(0,0,0,0.1)]" +
@@ -546,7 +554,7 @@ export default function ChatFooter() {
               </button>
             ) : (
               <>
-                {conv.service === "whatsapp" && (
+                {!isExpert && conv.service === "whatsapp" && (
                   <button
                     className="p-[8px] rounded-full cursor-pointer hover:bg-accent"
                     onClick={() => toggle("templatePicker", true)}
@@ -641,6 +649,7 @@ export default function ChatFooter() {
                   }}
                   onClick={() =>
                     !inCSWindow &&
+                    !isExpert &&
                     conv.service === "whatsapp" &&
                     toggle("templatePicker")
                   }
@@ -648,7 +657,9 @@ export default function ChatFooter() {
                     inCSWindow
                       ? undefined
                       : conv.service === "whatsapp"
-                        ? t(
+                        ? isExpert
+                          ? "Aguarde uma nova mensagem do contato para responder dentro da janela de 24 horas."
+                          : t(
                             "WhatsApp cierra la conversación a las 24 horas del último mensaje recibido. Para abrir la conversación debes utilizar una plantilla.",
                           )
                         : t(
@@ -665,13 +676,15 @@ export default function ChatFooter() {
                     onClick={() =>
                       inCSWindow
                         ? editableDiv.current?.focus()
-                        : conv.service === "whatsapp"
+                        : !isExpert && conv.service === "whatsapp"
                           ? toggle("templatePicker")
                           : undefined
                     }
                   >
                     {!inCSWindow ? (
-                      conv.service === "whatsapp" ? (
+                      isExpert ? (
+                        <span>Aguarde uma nova mensagem do contato</span>
+                      ) : conv.service === "whatsapp" ? (
                         <>
                           <span className="lg:hidden">
                             {t("Conversación cerrada")}

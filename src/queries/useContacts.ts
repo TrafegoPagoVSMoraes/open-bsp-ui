@@ -14,6 +14,7 @@ import {
 } from "@/utils/FormatUtils";
 import { queryKeys } from "./queryKeys";
 import type { Database } from "@/supabase/db_types";
+import { useProjectScope } from "./useProjects";
 
 type Service = Database["public"]["Enums"]["service"];
 
@@ -46,31 +47,35 @@ export function useContactByAddress(
 export function useContacts() {
   const userId = useBoundStore((state) => state.ui.user?.id);
   const orgId = useBoundStore((state) => state.ui.activeOrgId);
-  const activeProjectId = useBoundStore((state) => state.ui.activeProjectId);
+  const { projectIds, scopeKey, isLoading: scopeLoading } = useProjectScope();
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: queryKeys.contacts.all(orgId, activeProjectId),
+    queryKey: queryKeys.contacts.all(orgId, scopeKey),
     queryFn: async () => {
       const PAGE_SIZE = 1000;
       let allData: ContactWithAddressesRow[] = [];
       let offset = 0;
       let projectContactIds: string[] | null = null;
-      if (activeProjectId) {
-        const projectContacts = await (supabase as any)
-          .from("project_contacts")
-          .select("contact_id")
-          .eq("organization_id", orgId!)
-          .eq("project_id", activeProjectId);
-        if (!projectContacts.error) {
-          projectContactIds = Array.from(new Set(
-            (projectContacts.data ?? []).map((row: { contact_id: string }) => row.contact_id),
-          ));
-          if (projectContactIds.length === 0) return { data: [] };
+      if (projectIds !== null) {
+        if (projectIds.length === 0) return { data: [] };
+        const collected: string[] = [];
+        for (let from = 0; ; from += PAGE_SIZE) {
+          const { data, error } = await (supabase as any)
+            .from("project_contacts")
+            .select("contact_id")
+            .eq("organization_id", orgId!)
+            .in("project_id", projectIds)
+            .range(from, from + PAGE_SIZE - 1);
+          if (error) throw error;
+          collected.push(...(data ?? []).map((row: { contact_id: string }) => row.contact_id));
+          if ((data ?? []).length < PAGE_SIZE) break;
         }
+        projectContactIds = [...new Set(collected)];
+        if (projectContactIds.length === 0) return { data: [] };
       }
 
-      while (true) {
+      const loadPage = async (contactIds?: string[]) => {
         let contactsQuery = supabase
           .from("contacts")
           .select("*, addresses:contacts_addresses(*)")
@@ -80,12 +85,21 @@ export function useContacts() {
             referencedTable: "addresses",
             ascending: true,
           })
-          .range(offset, offset + PAGE_SIZE - 1);
-        if (projectContactIds) contactsQuery = contactsQuery.in("id", projectContactIds);
+          .range(contactIds ? 0 : offset, contactIds ? contactIds.length - 1 : offset + PAGE_SIZE - 1);
+        if (contactIds) contactsQuery = contactsQuery.in("id", contactIds);
         const { data: page } = await contactsQuery.throwOnError();
-
         allData = [...allData, ...(page as ContactWithAddressesRow[])];
-        if (page.length < PAGE_SIZE) break;
+        return page.length;
+      };
+
+      if (projectContactIds) {
+        for (let index = 0; index < projectContactIds.length; index += 200) {
+          await loadPage(projectContactIds.slice(index, index + 200));
+        }
+        allData.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "pt-BR"));
+      } else while (true) {
+        const count = await loadPage();
+        if (count < PAGE_SIZE) break;
         offset += PAGE_SIZE;
       }
 
@@ -98,7 +112,7 @@ export function useContacts() {
 
       return { data: allData };
     },
-    enabled: !!userId && !!orgId,
+    enabled: !!userId && !!orgId && !scopeLoading,
     select: (data) => data.data,
   });
 }
@@ -113,6 +127,7 @@ export function useContact(id: string) {
       await supabase
         .from("contacts")
         .select("*, addresses:contacts_addresses(*)")
+        .eq("organization_id", orgId!)
         .eq("id", id)
         .order("created_at", { referencedTable: "addresses", ascending: true })
         .single()
@@ -120,6 +135,43 @@ export function useContact(id: string) {
     enabled: !!userId && !!orgId && !!id,
     select: (data) => data.data as ContactWithAddressesRow,
     experimental_prefetchInRender: true,
+  });
+}
+
+export function useContactProjects(contactId: string | null | undefined) {
+  const orgId = useBoundStore((state) => state.ui.activeOrgId);
+  return useQuery({
+    queryKey: queryKeys.contacts.projects(orgId, contactId),
+    enabled: !!orgId && !!contactId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("project_contacts")
+        .select("project_id")
+        .eq("organization_id", orgId)
+        .eq("contact_id", contactId);
+      if (error) throw error;
+      return [...new Set((data ?? []).map((row: { project_id: string }) => row.project_id))] as string[];
+    },
+  });
+}
+
+export function useSetContactProjects() {
+  const orgId = useBoundStore((state) => state.ui.activeOrgId);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ contactId, projectIds }: { contactId: string; projectIds: string[] }) => {
+      if (!orgId) throw new Error("No active organization");
+      const { error } = await (supabase as any).rpc("set_contact_manual_projects", {
+        p_organization_id: orgId,
+        p_contact_id: contactId,
+        p_project_ids: projectIds,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.projects(orgId, variables.contactId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.contacts.root(orgId) }),
+    ]),
   });
 }
 

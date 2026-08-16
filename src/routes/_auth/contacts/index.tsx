@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SectionBody from "@/components/SectionBody";
 import SectionHeader from "@/components/SectionHeader";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -22,6 +22,7 @@ function ListContacts() {
   const { data: contacts } = useContacts();
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("");
+  const [visibleCount, setVisibleCount] = useState(100);
   const { data: tags = [] } = useTags();
   const { data: assignments = [] } = useContactTagAssignments();
 
@@ -41,6 +42,8 @@ function ListContacts() {
     );
     filtered = filtered.filter((contact) => taggedContactIds.has(contact.id));
   }
+
+  useEffect(() => setVisibleCount(100), [search, tagFilter, contacts]);
 
   return (
     <>
@@ -86,7 +89,7 @@ function ListContacts() {
             {t("Sin resultados para")} "{search}"
           </div>
         )}
-        {filtered.map((contact) => (
+        {filtered.slice(0, visibleCount).map((contact) => (
           <SectionItem
             key={contact.id}
             title={contact.name || t("Sin nombre")}
@@ -110,6 +113,11 @@ function ListContacts() {
             }
           />
         ))}
+        {visibleCount < filtered.length && (
+          <button className="my-3 rounded-lg border border-border px-4 py-2 text-sm" onClick={() => setVisibleCount((count) => count + 100)}>
+            Carregar mais ({filtered.length - visibleCount} restantes)
+          </button>
+        )}
       </SectionBody>
     </>
   );

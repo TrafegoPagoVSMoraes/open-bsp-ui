@@ -8,6 +8,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/supabase/client";
 import { useEffect, useState } from "react";
 import Spinner from "./Spinner";
+import { useProjectScope } from "@/queries/useProjects";
 
 export type ConvMetadata = {
   convId: string;
@@ -48,7 +49,7 @@ function pinnedAscending(a: ConversationRow, b: ConversationRow) {
 const ChatList = () => {
   const { translate: t } = useTranslation();
   const activeOrgId = useBoundStore((state) => state.ui.activeOrgId);
-  const activeProjectId = useBoundStore((state) => state.ui.activeProjectId);
+  const { projectIds, scopeKey } = useProjectScope();
   const conversations = useBoundStore((state) => state.chat.conversations);
   const messages = useBoundStore((state) => state.chat.messages);
   const conversationHistoryCursor = useBoundStore(
@@ -65,7 +66,10 @@ const ChatList = () => {
     (state) => state.chat.setConversationHistoryPagination,
   );
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [projectConversationIds, setProjectConversationIds] = useState<Set<string> | null>(null);
+  const [projectConversations, setProjectConversations] = useState<{
+    key: string;
+    ids: Set<string>;
+  } | null>(null);
   const filterName = useBoundStore((state) => state.ui.filter);
   const setFilterName = useBoundStore((state) => state.ui.setFilter);
   const searchPattern = useBoundStore((state) => state.ui.searchPattern);
@@ -73,25 +77,45 @@ const ChatList = () => {
 
   useEffect(() => {
     let cancelled = false;
-    if (!activeProjectId) {
-      setProjectConversationIds(null);
+    if (projectIds === null) {
+      setProjectConversations(null);
+      return;
+    }
+    if (projectIds.length === 0) {
+      setProjectConversations({ key: scopeKey, ids: new Set() });
       return;
     }
     (async () => {
-      const result = await (supabase as any)
-        .from("project_conversations")
-        .select("conversation_id")
-        .eq("organization_id", activeOrgId)
-        .eq("project_id", activeProjectId);
-      // Missing additive project tables must not break the legacy/admin view.
+      const rows: Array<{ conversation_id: string }> = [];
+      let resultError: unknown = null;
+      for (let from = 0; ; from += 1000) {
+        const result = await (supabase as any)
+          .from("project_conversations")
+          .select("conversation_id")
+          .eq("organization_id", activeOrgId)
+          .in("project_id", projectIds)
+          .range(from, from + 999);
+        if (result.error) {
+          resultError = result.error;
+          break;
+        }
+        rows.push(...(result.data ?? []));
+        if ((result.data ?? []).length < 1000) break;
+      }
       if (!cancelled) {
-        setProjectConversationIds(result.error
-          ? null
-          : new Set((result.data ?? []).map((row: { conversation_id: string }) => row.conversation_id)));
+        if (resultError) {
+          console.error("Could not load project conversations", resultError);
+          setProjectConversations({ key: scopeKey, ids: new Set() });
+        } else {
+          setProjectConversations({
+            key: scopeKey,
+            ids: new Set(rows.map((row) => row.conversation_id)),
+          });
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [activeOrgId, activeProjectId]);
+  }, [activeOrgId, projectIds?.join(","), scopeKey]);
 
   function getMostRecentMsg(convId: string): MessageRow | undefined {
     return messages.get(convId)?.values().next().value;
@@ -110,7 +134,8 @@ const ChatList = () => {
     .filter(
       (a) =>
         a.conv.organization_id === activeOrgId &&
-        (projectConversationIds === null || projectConversationIds.has(a.conv.id)) &&
+        (projectIds === null ||
+          (projectConversations?.key === scopeKey && projectConversations.ids.has(a.conv.id))) &&
         filters[filterName](a.conv, a.mostRecentMsg) &&
         !!a.mostRecentMsg,
     );

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/supabase/client";
 import useBoundStore from "@/stores/useBoundStore";
 import type { CampaignImportRecord } from "@/utils/CampaignImportUtils";
+import { useProjectScope } from "./useProjects";
 
 export type CampaignStatus =
   | "draft"
@@ -60,11 +61,22 @@ async function invokeCampaign<T>(body: InvokeBody): Promise<T> {
 
 export function useCampaigns() {
   const organizationId = useBoundStore((state) => state.ui.activeOrgId);
-  const projectId = useBoundStore((state) => state.ui.activeProjectId);
+  const { projectIds, scopeKey, isLoading } = useProjectScope();
   return useQuery({
-    queryKey: ["campaigns", organizationId, projectId],
-    queryFn: () => invokeCampaign<CampaignSummary[]>({ action: "list_campaigns", organization_id: organizationId, project_id: projectId }),
-    enabled: !!organizationId,
+    queryKey: ["campaigns", organizationId, scopeKey],
+    queryFn: async () => {
+      if (projectIds === null) {
+        return invokeCampaign<CampaignSummary[]>({ action: "list_campaigns", organization_id: organizationId, project_id: null });
+      }
+      if (!projectIds.length) return [];
+      const pages = await Promise.all(projectIds.map((projectId) =>
+        invokeCampaign<CampaignSummary[]>({ action: "list_campaigns", organization_id: organizationId, project_id: projectId })
+      ));
+      const campaigns = new Map<string, CampaignSummary>();
+      for (const campaign of pages.flat()) campaigns.set(campaign.id, campaign);
+      return [...campaigns.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+    enabled: !!organizationId && !isLoading,
     refetchInterval: (query) =>
       query.state.data?.some((campaign) => ["queued", "running", "cancel_requested"].includes(campaign.status))
         ? 5000
@@ -83,6 +95,7 @@ export function useCampaignAudience(
     queryKey: [
       "campaign-audience",
       organizationId,
+      projectId,
       organizationAddress,
       [...tagIds].sort(),
       [...excludedTagIds].sort(),
@@ -96,7 +109,7 @@ export function useCampaignAudience(
       exclude_tag_ids: excludedTagIds,
       include_available_tags: true,
     }),
-    enabled: !!organizationId,
+    enabled: !!organizationId && !!projectId,
   });
 }
 
@@ -105,12 +118,16 @@ export function useCampaignActions() {
   const projectId = useBoundStore((state) => state.ui.activeProjectId);
   const queryClient = useQueryClient();
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["campaigns", organizationId] });
+  const requireProject = () => {
+    if (!projectId) throw new Error("Selecione um único projeto para criar ou enviar uma campanha.");
+    return projectId;
+  };
 
   const previewImport = useMutation({
     mutationFn: ({ records, organizationAddress }: { records: CampaignImportRecord[]; organizationAddress: string }) => invokeCampaign<CampaignAudience>({
       action: "preview_import",
       organization_id: organizationId,
-      project_id: projectId,
+      project_id: requireProject(),
       organization_address: organizationAddress,
       records,
     }),
@@ -119,7 +136,7 @@ export function useCampaignActions() {
     mutationFn: (payload: InvokeBody) => invokeCampaign<{ id?: string; external_id?: string; status: string }>({
       action: "create_test",
       organization_id: organizationId,
-      project_id: projectId,
+      project_id: requireProject(),
       ...payload,
     }),
   });
@@ -127,7 +144,7 @@ export function useCampaignActions() {
     mutationFn: (payload: InvokeBody) => invokeCampaign<{ id: string }>({
       action: "create_campaign",
       organization_id: organizationId,
-      project_id: projectId,
+      project_id: requireProject(),
       ...payload,
     }),
     onSuccess: invalidate,

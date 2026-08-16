@@ -31,8 +31,8 @@ export const queryKeys = {
   },
   contacts: {
     root: (orgId: NullableId) => [orgId, "contacts"] as const,
-    all: (orgId: NullableId, projectId?: NullableId) =>
-      [orgId, "contacts", projectId ?? null] as const,
+    all: (orgId: NullableId, projectScope?: string | null) =>
+      [orgId, "contacts", projectScope ?? null] as const,
     detail: (orgId: NullableId, id: NullableId) =>
       [orgId, "contacts", id] as const,
     // contacts_addresses PK is (organization_id, service, address): the same
@@ -46,6 +46,8 @@ export const queryKeys = {
       service: NullableId,
       address: NullableId,
     ) => [orgId, "contacts_addresses", service, address] as const,
+    projects: (orgId: NullableId, contactId: NullableId) =>
+      [orgId, "contacts", contactId, "projects"] as const,
   },
   organizations: {
     all: () => ["organizations"] as const,

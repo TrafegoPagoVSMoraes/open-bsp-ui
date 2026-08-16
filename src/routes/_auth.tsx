@@ -12,7 +12,7 @@ import ActionCard from "@/components/ActionCard";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Bot, Building2, MessageSquarePlus, Settings } from "lucide-react";
 import { useResizable } from "@/hooks/useResizable";
-import { useCurrentAgents } from "@/queries/useAgents";
+import { useCurrentAgent, useCurrentAgents } from "@/queries/useAgents";
 import StatsCenter from "@/components/stats/StatsCenter";
 
 export const Route = createFileRoute("/_auth")({
@@ -35,6 +35,9 @@ function AppLayout() {
   const { translate: t } = useTranslation();
   const activeOrgId = useBoundStore((state) => state.ui.activeOrgId);
   const { data: agents } = useCurrentAgents();
+  const { data: currentAgent } = useCurrentAgent();
+  const isExpert =
+    (currentAgent?.extra as { account_type?: string } | null)?.account_type === "expert";
   const hasAiAgents = agents?.some((a) => a.ai);
   const activeConvId = useBoundStore((state) => state.ui.activeConvId);
   const setActiveConv = useBoundStore((state) => state.ui.setActiveConv);
@@ -144,25 +147,25 @@ function AppLayout() {
             )}
             {activeOrgId && (
               <>
-                {!hasAiAgents && (
+                {!isExpert && !hasAiAgents && (
                   <ActionCard
                     icon={<Bot className="w-[24px] h-[24px]" />}
                     title={t("Crear agente")}
                     to="/agents/new"
                   />
                 )}
-                {hasAiAgents && (
+                {!isExpert && hasAiAgents && (
                   <ActionCard
                     icon={<MessageSquarePlus className="w-[24px] h-[24px]" />}
                     title={t("Iniciar conversación")}
                     to="/conversations/new"
                   />
                 )}
-                <ActionCard
+                {!isExpert && <ActionCard
                   icon={<Settings className="w-[24px] h-[24px]" />}
                   title={t("Configurar WhatsApp")}
                   to="/integrations/whatsapp/new"
-                />
+                />}
               </>
             )}
           </div>

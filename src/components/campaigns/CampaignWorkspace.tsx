@@ -31,6 +31,7 @@ import {
   normalizeCampaignPhone,
   parseCampaignImport,
 } from "@/utils/CampaignImportUtils";
+import useBoundStore from "@/stores/useBoundStore";
 
 type AudienceMode = "import" | "tags";
 type Mapping = { source: string; constant?: string };
@@ -127,6 +128,7 @@ function CampaignRow({ campaign, onCancel }: { campaign: CampaignSummary; onCanc
 }
 
 export default function CampaignWorkspace() {
+  const activeProjectId = useBoundStore((state) => state.ui.activeProjectId);
   useCampaignRealtime();
   const [mode, setMode] = useState<AudienceMode>("import");
   const [preview, setPreview] = useState<CampaignImportPreview>();
@@ -244,6 +246,7 @@ export default function CampaignWorkspace() {
 
   async function launch() {
     setNotice("");
+    if (!activeProjectId) return setNotice("Selecione um único projeto no menu da conta antes de criar a campanha.");
     if (!organizationAddress || !selectedTemplate) return setNotice("Selecione o número remetente e um template UTILITY aprovado.");
     if (!audienceCount) return setNotice("A campanha precisa ter pelo menos um destinatário elegível.");
     if (hasDynamicUrl(selectedTemplate) && (!trackingProjectId || !trackingDestination.trim())) return setNotice("Selecione o projeto de tracking e a URL final.");
@@ -283,6 +286,7 @@ export default function CampaignWorkspace() {
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
               Prepare o público e o template aqui. O envio é executado no backend, com deduplicação e bloqueio de opt-outs.
             </p>
+            {!activeProjectId && <p className="mt-2 text-sm text-amber-400">O histórico respeita o filtro global. Para preparar um novo envio, selecione um projeto específico.</p>}
           </div>
           <button className="flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4" /> Atualizar

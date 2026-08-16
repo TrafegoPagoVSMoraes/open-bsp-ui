@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import SectionHeader from "@/components/SectionHeader";
 import { useTranslation } from "@/hooks/useTranslation";
-import { useCreateContact } from "@/queries/useContacts";
+import { useCreateContact, useSetContactProjects } from "@/queries/useContacts";
 import { Controller, useForm, useFieldArray } from "react-hook-form";
 import SectionBody from "@/components/SectionBody";
 import SectionFooter from "@/components/SectionFooter";
@@ -12,8 +12,10 @@ import { isValidPhoneNumber } from "@/utils/FormatUtils";
 import FieldError from "@/components/FieldError";
 import TagSelector from "@/components/TagSelector";
 import { useSetContactTags } from "@/queries/useTags";
+import ProjectSelector from "@/components/ProjectSelector";
+import useBoundStore from "@/stores/useBoundStore";
 
-type ContactFormValues = ContactWithAddressesInsert & { tag_ids: string[] };
+type ContactFormValues = ContactWithAddressesInsert & { tag_ids: string[]; project_ids: string[] };
 
 export const Route = createFileRoute("/_auth/contacts/new")({
   component: ContactNew,
@@ -24,6 +26,8 @@ function ContactNew() {
   const navigate = useNavigate();
   const createContact = useCreateContact();
   const setContactTags = useSetContactTags();
+  const setContactProjects = useSetContactProjects();
+  const activeProjectId = useBoundStore((state) => state.ui.activeProjectId);
 
   const {
     register,
@@ -35,6 +39,7 @@ function ContactNew() {
     defaultValues: {
       addresses: [{ address: "" }],
       tag_ids: [],
+      project_ids: activeProjectId ? [activeProjectId] : [],
     },
   });
 
@@ -50,12 +55,12 @@ function ContactNew() {
       <SectionBody>
         <form
           id="contact-form"
-          onSubmit={handleSubmit(async ({ tag_ids, ...data }) => {
+          onSubmit={handleSubmit(async ({ tag_ids, project_ids, ...data }) => {
             const contact = await createContact.mutateAsync(data);
-            await setContactTags.mutateAsync({
-              contactId: contact.id,
-              tagIds: tag_ids,
-            });
+            await Promise.all([
+              setContactTags.mutateAsync({ contactId: contact.id, tagIds: tag_ids }),
+              setContactProjects.mutateAsync({ contactId: contact.id, projectIds: project_ids }),
+            ]);
             navigate({
               to: `/contacts/${contact.id}`,
               hash: (prevHash) => prevHash!,
@@ -87,6 +92,14 @@ function ContactNew() {
             control={control}
             render={({ field }) => (
               <TagSelector value={field.value ?? []} onChange={field.onChange} />
+            )}
+          />
+
+          <Controller
+            name="project_ids"
+            control={control}
+            render={({ field }) => (
+              <ProjectSelector value={field.value ?? []} onChange={field.onChange} />
             )}
           />
 
@@ -137,7 +150,7 @@ function ContactNew() {
           form="contact-form"
           type="submit"
           invalid={!isValid || !isDirty}
-          loading={createContact.isPending || setContactTags.isPending}
+          loading={createContact.isPending || setContactTags.isPending || setContactProjects.isPending}
           className="primary"
         >
           {t("Crear")}
